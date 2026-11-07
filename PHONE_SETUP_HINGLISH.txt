@@ -1,0 +1,26 @@
+SHARICUT STUDIO PRO — Pixel/Android par APK kaise banayen
+
+1) Is ZIP ko phone ke Downloads folder mein rakhein.
+2) Termux app open karein. Commands:
+
+pkg update -y
+pkg install -y git gh unzip
+termux-setup-storage
+cd ~
+unzip /storage/emulated/0/Download/ShariCutStudioPRO-source.zip
+cd ShariCutStudioPRO
+gh auth login
+
+3) GitHub sign-in complete karein. Phir (email apni lagaen):
+
+git init -b main
+git add .
+git -c user.name="Shari" -c user.email="YOUR_EMAIL@example.com" commit -m "Initial app"
+gh repo create ShariCutStudioPRO --private --source=. --remote=origin --push
+
+4) GitHub website -> ShariCutStudioPRO -> Actions -> Build Android APK.
+5) Successful build ka artifact ShariCutStudioPRO-debug-APK download karein.
+6) ZIP extract karein, app-debug.apk install karein (Allow install unknown apps).
+
+Yeh SOURCE PROJECT hai. APK abhi separately built/tested nahin hai, aur agar CI build error aaye to source mein fix karna hoga.
+Automatic AI captions ke liye optional Groq API key + internet chahiye. Bina key silence cutting, audio filters aur manual SRT functionality local hain.
