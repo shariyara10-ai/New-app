@@ -83,7 +83,6 @@ public class MainActivity extends Activity {
     private Button button(String title, int color) {
         Button b = new Button(this);
         b.setText(title);
-        b.setTextAllCaps(false);
         b.setTextColor(Color.WHITE);
         b.setTextSize(15);
         b.setBackground(bg(color, 14));
