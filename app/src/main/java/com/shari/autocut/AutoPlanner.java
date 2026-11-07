@@ -54,7 +54,7 @@ public class AutoPlanner {
     current=new Beat(s);beats.add(current);
    }else current.append(s);
   }
-  sb.append("SHARI AUTOCUT — COMPACT VISUAL SHOT LIST\n");
+  sb.append("CINEZEHN AI STUDIO — COMPACT VISUAL SHOT LIST\n");
   sb.append("Visual beats: ").append(beats.size()).append(" (captions: ").append(segs.size()).append(")\n");
   sb.append("You do NOT need a separate PNG for every caption. Reuse visual assets.\n");
   sb.append("IMPORTANT: Check Urdu/Hindi speech-to-text and correct transcript before using these suggestions. The offline planner does not understand or fact-check meaning.\n\n");

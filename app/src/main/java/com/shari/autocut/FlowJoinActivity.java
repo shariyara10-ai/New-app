@@ -56,7 +56,7 @@ public final class FlowJoinActivity extends Activity {
   root=new LinearLayout(this);root.setOrientation(LinearLayout.VERTICAL);root.setPadding(dp(16),dp(22),dp(16),dp(30));
   sc.addView(root);sc.setOnApplyWindowInsetsListener((v,i)->{sc.setPadding(0,i.getSystemWindowInsetTop(),0,i.getSystemWindowInsetBottom());return i;});
   setContentView(sc);
-  add(root,title("SHARI / AUTOCUT PRO",12,false));add(root,title("Flow Scene Joiner",27,true));
+  add(root,title("CINEZEHN / AI STUDIO",12,false));add(root,title("Flow Scene Joiner",27,true));
   add(root,title("Sequence your Flow/Veo clips with original built-in voiceovers. No meme insertions or extra scene effects. Optional animated outro.",13,false));
   LinearLayout input=panel("1  Select videos");
   Button pick=button("Select multiple Flow clips");add(input,pick);pick.setOnClickListener(v->select());
@@ -186,7 +186,7 @@ public final class FlowJoinActivity extends Activity {
      @Override public void onCompleted(Composition composition,ExportResult r){
       stopTicker();status.setText("Video encoded. Saving...");
       io.execute(()->{
-       try{Uri u=save(file);runOnUiThread(()->{saved=u;busy=false;joinButton.setEnabled(true);progress.setProgress(100);status.setText("Saved to Movies/ShariAutoCut.");});}
+       try{Uri u=save(file);runOnUiThread(()->{saved=u;busy=false;joinButton.setEnabled(true);progress.setProgress(100);status.setText("Saved to Movies/CineZehn.");});}
        catch(Exception e){runOnUiThread(()->failure("Encoded but could not save: "+e.getMessage()));}
        finally{file.delete();}
       });
@@ -219,9 +219,9 @@ public final class FlowJoinActivity extends Activity {
   }).setNegativeButton("Close",null).show();
  });}
  private Uri save(File file)throws Exception{
-  ContentValues cv=new ContentValues();cv.put(MediaStore.Video.Media.DISPLAY_NAME,"Shari_Flow_"+System.currentTimeMillis()+".mp4");
+  ContentValues cv=new ContentValues();cv.put(MediaStore.Video.Media.DISPLAY_NAME,"CineZehn_Flow_"+System.currentTimeMillis()+".mp4");
   cv.put(MediaStore.Video.Media.MIME_TYPE,"video/mp4");
-  cv.put(MediaStore.Video.Media.RELATIVE_PATH,Environment.DIRECTORY_MOVIES+"/ShariAutoCut");
+  cv.put(MediaStore.Video.Media.RELATIVE_PATH,Environment.DIRECTORY_MOVIES+"/CineZehn");
   cv.put(MediaStore.Video.Media.IS_PENDING,1);
   Uri u=getContentResolver().insert(MediaStore.Video.Media.EXTERNAL_CONTENT_URI,cv);
   if(u==null)throw new Exception("Gallery insert failed");

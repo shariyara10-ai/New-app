@@ -91,7 +91,7 @@ public class MainActivity extends Activity {
    return insets;
   });
   setContentView(scroll);
-  add(root,label("SHARI / AUTOCUT OFFLINE",13,aqua,true),0);
+  add(root,label("CINEZEHN / AI STUDIO",13,aqua,true),0);
   add(root,label("AI Director + Video Editor",26,Color.WHITE,true),7);
   add(root,label("100% phone-based media editing. No desktop server, account or API key required. Offline Vosk model imported separately.",13,Color.rgb(177,191,210),false),9);
   LinearLayout flow=panel();
@@ -292,7 +292,7 @@ public class MainActivity extends Activity {
   new AlertDialog.Builder(this).setTitle("Scene PNG & motion prompts").setView(sv)
    .setPositiveButton("Copy all",(dialog,which)->{
     android.content.ClipboardManager cm=(android.content.ClipboardManager)getSystemService(CLIPBOARD_SERVICE);
-    cm.setPrimaryClip(android.content.ClipData.newPlainText("AutoCut prompts",text));update("Prompts copied to clipboard.");
+    cm.setPrimaryClip(android.content.ClipData.newPlainText("CineZehn prompts",text));update("Prompts copied to clipboard.");
    }).setNegativeButton("Close",null).show();
  }
  private void showDirector(){
@@ -327,9 +327,9 @@ public class MainActivity extends Activity {
   p.setShader(new LinearGradient(0,0,w,h,new int[]{Color.rgb(8,15,37),Color.rgb(27,48,83),Color.rgb(5,11,30)},null,Shader.TileMode.CLAMP));
   c.drawRect(0,0,w,h,p);p.setShader(null);
   p.setTextSize(36f);p.setColor(Color.rgb(210,216,224));p.setTypeface(android.graphics.Typeface.DEFAULT_BOLD);p.setTextAlign(Paint.Align.CENTER);
-  c.drawText("SHARI  •  AUDIO STORY",w/2f,140f,p);
+  c.drawText("CINEZEHN  •  AUDIO STORY",w/2f,140f,p);
   p.setTextSize(23f);p.setColor(Color.rgb(121,192,226));c.drawText("AUTO-CUT OFFLINE",w/2f,1220f,p);
-  File f=new File(getCacheDir(),"autocut_story_background.png");
+  File f=new File(getCacheDir(),"cinezehn_story_background.png");
   try(FileOutputStream out=new FileOutputStream(f)){b.compress(Bitmap.CompressFormat.PNG,95,out);}
   b.recycle();return f;
  }
@@ -350,7 +350,7 @@ public class MainActivity extends Activity {
   setBusy(true);progress.setProgress(8);update("Preparing offline video render...");
   final long start=trim[0],end=trim[1];
   final boolean audioOnlyExport=isAudioOnly;
-  File out=new File(getCacheDir(),"autocut_export_"+System.currentTimeMillis()+".mp4");
+  File out=new File(getCacheDir(),"cinezehn_export_"+System.currentTimeMillis()+".mp4");
   try {
    final List<Effect> videoFx=new ArrayList<>();
    int f=format.getSelectedItemPosition();
@@ -370,7 +370,7 @@ public class MainActivity extends Activity {
       stopProgressPolling();
       update("Encoding complete. Saving MP4 to phone Gallery...");progress.setProgress(92);
       jobs.execute(()->{
-       try{Uri saved=saveVideo(out);runOnUiThread(()->{savedVideo=saved;setBusy(false);progress.setProgress(100);update("Export saved successfully to Movies/ShariAutoCut. Open Gallery or tap Share.");});}
+       try{Uri saved=saveVideo(out);runOnUiThread(()->{savedVideo=saved;setBusy(false);progress.setProgress(100);update("Export saved successfully to Movies/CineZehn. Open Gallery or tap Share.");});}
        catch(Exception ex){runOnUiThread(()->{setBusy(false);error("Video encoded but Gallery saving failed: "+ex.getMessage());});}
        finally{out.delete();}
       });
@@ -441,7 +441,7 @@ public class MainActivity extends Activity {
   details.append("\nPhone: ").append(android.os.Build.MODEL).append(" / Android ").append(android.os.Build.VERSION.RELEASE);
   details.append("\nFree cache space: ").append(new StatFs(getCacheDir().getAbsolutePath()).getAvailableBytes()/1024/1024).append(" MB");
   String diagnostic=details.toString();
-  android.util.Log.e("ShariAutoCut","Export diagnostic: "+diagnostic,exception);
+  android.util.Log.e("CineZehn","Export diagnostic: "+diagnostic,exception);
   status.setText("Export failed (code "+exception.errorCode+"). Use Copy Diagnostics below; try TEST EXPORT: First 15 Seconds.");
   String advice=exception.errorCode==ExportException.ERROR_CODE_MUXING_TIMEOUT
    ?"Muxer stopped receiving samples. Try exporting a 15-second sample or use a shorter section. A longer watchdog cannot repair a permanently stalled decoder."
@@ -453,16 +453,16 @@ public class MainActivity extends Activity {
    .setMessage(advice+"\n\n"+diagnostic)
    .setPositiveButton("Copy diagnostics",(dialog,which)->{
     android.content.ClipboardManager clipboard=(android.content.ClipboardManager)getSystemService(CLIPBOARD_SERVICE);
-    clipboard.setPrimaryClip(android.content.ClipData.newPlainText("AutoCut export diagnostic",diagnostic));
+    clipboard.setPrimaryClip(android.content.ClipData.newPlainText("CineZehn export diagnostic",diagnostic));
     Toast.makeText(this,"Details copied. Share them for targeted troubleshooting.",Toast.LENGTH_LONG).show();
    })
    .setNegativeButton("Close",null)
    .show();
  }
  private Uri saveVideo(File src) throws Exception{
-  String name="ShariAutoCut_"+System.currentTimeMillis()+".mp4";
+  String name="CineZehn_"+System.currentTimeMillis()+".mp4";
   ContentValues cv=new ContentValues();cv.put(MediaStore.Video.Media.DISPLAY_NAME,name);cv.put(MediaStore.Video.Media.MIME_TYPE,"video/mp4");
-  cv.put(MediaStore.Video.Media.RELATIVE_PATH,Environment.DIRECTORY_MOVIES+"/ShariAutoCut");
+  cv.put(MediaStore.Video.Media.RELATIVE_PATH,Environment.DIRECTORY_MOVIES+"/CineZehn");
   cv.put(MediaStore.Video.Media.IS_PENDING,1);
   Uri u=getContentResolver().insert(MediaStore.Video.Media.EXTERNAL_CONTENT_URI,cv);
   if(u==null)throw new IllegalStateException("Cannot create video in MediaStore");

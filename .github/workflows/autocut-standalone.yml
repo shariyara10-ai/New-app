@@ -1,4 +1,4 @@
-name: Build standalone offline AutoCut APK
+name: Build CineZehn AI Studio Android APK
 on:
   push:
     branches: [shari-autocut-standalone]
@@ -24,6 +24,6 @@ jobs:
         run: gradle --no-daemon assembleDebug
       - uses: actions/upload-artifact@v4
         with:
-          name: Shari-AutoCut-Offline-Android-APK
+          name: CineZehn-AI-Studio-Android-APK
           path: app/build/outputs/apk/debug/app-debug.apk
           if-no-files-found: error

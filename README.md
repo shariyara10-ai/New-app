@@ -1,11 +1,11 @@
-# Shari AutoCut Offline — Standalone Android v0.2.1
+# CineZehn AI Studio — Standalone Android v0.3.2
 
 **This APK works on an Android phone without a PC, local server, OpenAI API, cloud account, or subscription.**
 
-Native Android app: media files from device storage, video preview, editable time-coded captions, offline speech recognition with a user-installed Vosk model, rule-based motion style planning, animated burned-in captions, optional imported PNG sticker, trim/crop, Media3 Transformer encoding, audio-only narration to captioned video, MP4 saved into Movies/ShariAutoCut.
+Native Android app: media files from device storage, video preview, editable time-coded captions, offline speech recognition with a user-installed Vosk model, rule-based motion style planning, animated burned-in captions, optional imported PNG sticker, trim/crop, Media3 Transformer encoding, audio-only narration to captioned video, MP4 saved into Movies/CineZehn.
 
 ## Build
-GitHub Actions branch: `shari-autocut-standalone`. Download the latest successful run artifact named `Shari-AutoCut-Offline-Android-APK` and install `app-debug.apk` after extracting. Target: Android 10+ (API 29+). No Play Store needed.
+GitHub Actions branch: `shari-autocut-standalone`. Download the latest successful run artifact named `CineZehn-AI-Studio-Android-APK` and install `app-debug.apk` after extracting. Target: Android 10+ (API 29+). No Play Store needed.
 
 ## First-run offline workflow
 1. Open the APK and tap **Choose Video / Audio**; select an MP4, M4A, MP3, etc. supported by Android codecs.
@@ -13,7 +13,7 @@ GitHub Actions branch: `shari-autocut-standalone`. Download the latest successfu
 3. Tap **Transcribe selected audio OFFLINE**. The app uses Android MediaExtractor/MediaCodec to decode the selected recording, converts PCM to mono 16 kHz for Vosk, and receives word-timestamped JSON results. Long recordings may be slow; keep app open.
 4. Review and correct the captions. If no model is installed, paste your own script manually; timestamped format is `[00:00.00-00:02.20] Your sentence`. Plain text also works and gets evenly spaced segments.
 5. Tap **Plan caption motion** (local keyword rules: mystery, warning, numbers, titles and pop). Pick a style preset. You can generate text prompts for optional image assets; no images are generated or downloaded automatically.
-6. Select trim start/end and 9:16, 16:9 or square. Tap **Render and save MP4 to Gallery**. The app uses AndroidX Media3 Transformer to encode MP4 on your device; output appears in `Movies/ShariAutoCut`. Audio-only inputs are paired with a generated background image to produce video.
+6. Select trim start/end and 9:16, 16:9 or square. Tap **Render and save MP4 to Gallery**. The app uses AndroidX Media3 Transformer to encode MP4 on your device; output appears in `Movies/CineZehn`. Audio-only inputs are paired with a generated background image to produce video.
 7. Share video through Android sharing sheet.
 
 ## Honest feature boundaries

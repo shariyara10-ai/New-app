@@ -70,7 +70,7 @@ public final class CaptionOverlay extends CanvasOverlay {
   if("documentary".equals(preset)){
     paint.setTextAlign(Paint.Align.LEFT);paint.setTypeface(android.graphics.Typeface.DEFAULT_BOLD);
     paint.setTextSize(20f*unit);paint.setColor(Color.argb(220,247,208,99));
-    c.drawText("SHARI  /  AUTOCUT OFFLINE",26f*unit,39f*unit,paint);
+    c.drawText("CINEZEHN / AI STUDIO",26f*unit,39f*unit,paint);
   }
  }
  private String[] wrap(String s,int approxMax) {

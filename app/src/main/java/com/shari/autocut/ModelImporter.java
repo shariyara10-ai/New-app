@@ -34,7 +34,7 @@ public class ModelImporter {
    con.setConnectTimeout(30000);
    con.setReadTimeout(60000);
    con.setInstanceFollowRedirects(true);
-   con.setRequestProperty("User-Agent","ShariAutoCutOffline/0.2.1");
+   con.setRequestProperty("User-Agent","CineZehnAIStudio/0.3.2");
    con.connect();
    if(con.getResponseCode()!=200)throw new IOException("Official download HTTP "+con.getResponseCode()+". Try manual ZIP download.");
    long total=con.getContentLengthLong();
