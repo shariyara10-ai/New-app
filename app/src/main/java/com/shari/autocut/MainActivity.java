@@ -17,6 +17,7 @@ import android.media.MediaMetadataRetriever;
 import android.net.Uri;
 import android.os.Bundle;
 import android.os.Environment;
+import android.os.StatFs;
 import android.provider.MediaStore;
 import android.text.InputType;
 import android.view.Gravity;
@@ -34,6 +35,7 @@ import androidx.media3.transformer.Effects;
 import androidx.media3.transformer.ExportException;
 import androidx.media3.transformer.ExportResult;
 import androidx.media3.transformer.Transformer;
+import androidx.media3.transformer.ProgressHolder;
 
 import java.io.File;
 import java.io.FileOutputStream;
@@ -65,6 +67,9 @@ public class MainActivity extends Activity {
  private Button transcribeButton,exportButton,autoButton;
  private Uri savedVideo=null;
  private Transformer transformer=null;
+ private Button testExportButton;
+ private final android.os.Handler renderHandler=new android.os.Handler(android.os.Looper.getMainLooper());
+ private Runnable renderProgressTask=null;
  private boolean busy=false;
  private LinearLayout root;
  private int d(float n){return Math.round(n*getResources().getDisplayMetrics().density);}
@@ -133,6 +138,8 @@ public class MainActivity extends Activity {
   add(out,label("4  Export video on this phone",17,Color.WHITE,true),0);
   format=new Spinner(this);format.setAdapter(spinnerAdapter(new String[]{"9:16 Shorts • 720×1280 target","16:9 YouTube • 1280×720 target","1:1 Square"}));add(out,format,10);
   exportButton=btn("Render and save MP4 to Gallery");add(out,exportButton,10);exportButton.setOnClickListener(v->export());
+  testExportButton=btn("TEST EXPORT: First 15 Seconds");add(out,testExportButton,8);testExportButton.setOnClickListener(v->export(true));
+  add(out,label("For long audio-only videos, test 15 seconds before rendering the entire recording. Audio-only exports use phone-friendly 15 FPS settings.",12,Color.rgb(171,193,212),false),7);
   Button share=btn("Share last export");add(out,share,6);share.setOnClickListener(v->shareExport());
   progress=new ProgressBar(this,null,android.R.attr.progressBarStyleHorizontal);progress.setMax(100);add(out,progress,9);
   status=label("Ready. Import a media file; paste transcript or add an offline speech model.",13,Color.rgb(191,211,226),false);add(out,status,9);
@@ -302,22 +309,30 @@ public class MainActivity extends Activity {
   try(FileOutputStream out=new FileOutputStream(f)){b.compress(Bitmap.CompressFormat.PNG,95,out);}
   b.recycle();return f;
  }
- private void export(){
+ private void export(){export(false);}
+ private void export(boolean diagnosticTest){
   if(busy)return;
   if(source==null){error("Import video or audio first.");return;}
   long[] trim=trimTimes();
   if(trim==null){error("Invalid start/end. End must be after start and within media duration.");return;}
+  if(diagnosticTest)trim[1]=Math.min(trim[1],trim[0]+15000L);
+  long available=new StatFs(getCacheDir().getAbsolutePath()).getAvailableBytes();
+  if(available<200L*1024*1024) {
+   error("Not enough free storage for MP4 export. Free at least 200 MB, preferably 1 GB for long clips.");return;
+  }
   ArrayList<CaptionSegment> parsed=parsed();
   if(parsed.isEmpty()){error("Enter a transcript for motion captions, or use transcription.");return;}
   AutoPlanner.apply(parsed,presetValue());scenes=parsed;
   setBusy(true);progress.setProgress(8);update("Preparing offline video render...");
   final long start=trim[0],end=trim[1];
+  final boolean audioOnlyExport=isAudioOnly;
   File out=new File(getCacheDir(),"autocut_export_"+System.currentTimeMillis()+".mp4");
   try {
    final List<Effect> videoFx=new ArrayList<>();
    int f=format.getSelectedItemPosition();
    float ratio=f==0?9f/16f:f==1?16f/9f:1f;
    int height=f==0?1280:f==1?720:720;
+   if(audioOnlyExport && (end-start)>60000)height=f==0?960:540;
    videoFx.add(Presentation.createForAspectRatio(ratio,Presentation.LAYOUT_SCALE_TO_FIT_WITH_CROP));
    videoFx.add(Presentation.createForHeight(height));
    videoFx.add(new OverlayEffect(Collections.singletonList(new CaptionOverlay(parsed,presetValue(),selectedPng,start))));
@@ -325,8 +340,10 @@ public class MainActivity extends Activity {
    transformer=new Transformer.Builder(this)
     .setVideoMimeType(MimeTypes.VIDEO_H264)
     .setAudioMimeType(MimeTypes.AUDIO_AAC)
+    .setMaxDelayBetweenMuxerSamplesMs(120000L)
     .addListener(new Transformer.Listener() {
      @Override public void onCompleted(Composition composition,ExportResult result) {
+      stopProgressPolling();
       update("Encoding complete. Saving MP4 to phone Gallery...");progress.setProgress(92);
       jobs.execute(()->{
        try{Uri saved=saveVideo(out);runOnUiThread(()->{savedVideo=saved;setBusy(false);progress.setProgress(100);update("Export saved successfully to Movies/ShariAutoCut. Open Gallery or tap Share.");});}
@@ -335,7 +352,8 @@ public class MainActivity extends Activity {
       });
      }
      @Override public void onError(Composition composition,ExportResult result,ExportException ex) {
-      setBusy(false);out.delete();error("Video export failed: "+ex.getMessage());
+      stopProgressPolling();
+      setBusy(false);out.delete();reportExportError(ex,start,end,audioOnlyExport);
      }
     }).build();
    MediaItem.ClippingConfiguration clipping=new MediaItem.ClippingConfiguration.Builder().setStartPositionMs(start).setEndPositionMs(end).build();
@@ -345,7 +363,7 @@ public class MainActivity extends Activity {
    }else{
     File background=backgroundForAudio(end-start);
     MediaItem image=new MediaItem.Builder().setUri(Uri.fromFile(background)).setImageDurationMs(end-start).build();
-    EditedMediaItem video=new EditedMediaItem.Builder(image).setFrameRate(24).setEffects(fx).build();
+    EditedMediaItem video=new EditedMediaItem.Builder(image).setFrameRate(15).setEffects(fx).build();
     MediaItem audio=new MediaItem.Builder().setUri(source).setClippingConfiguration(clipping).build();
     EditedMediaItem sound=new EditedMediaItem.Builder(audio).build();
     Composition composition=new Composition.Builder(Arrays.asList(
@@ -354,8 +372,68 @@ public class MainActivity extends Activity {
     )).build();
     transformer.start(composition,out.getAbsolutePath());
    }
-   progress.setProgress(20);update("Rendering MP4 locally; keep app open. Very large files may take longer.");
-  }catch(Exception e){setBusy(false);out.delete();error("Render cannot start: "+e.getClass().getSimpleName()+": "+e.getMessage());}
+   progress.setProgress(20);
+   update(diagnosticTest?"Rendering 15-second diagnostic video...":"Rendering MP4 locally. Audio-only export uses 15 fps for compatibility.");
+   startProgressPolling();
+  }catch(Exception e){stopProgressPolling();setBusy(false);out.delete();error("Render cannot start: "+e.getClass().getSimpleName()+": "+e.getMessage());}
+ }
+
+ private void startProgressPolling(){
+  stopProgressPolling();
+  renderProgressTask=new Runnable(){
+   @Override public void run(){
+    if(transformer==null || !busy)return;
+    try{
+     ProgressHolder holder=new ProgressHolder();
+     int state=transformer.getProgress(holder);
+     if(state==Transformer.PROGRESS_STATE_AVAILABLE){
+      int percentage=Math.max(20,Math.min(90,20+(int)(holder.progress*0.70f)));
+      progress.setProgress(percentage);
+      update("Rendering: "+holder.progress+"% • Keep the app open.");
+     }
+     if(state==Transformer.PROGRESS_STATE_NOT_STARTED)return;
+    }catch(Exception ignored){}
+    renderHandler.postDelayed(this,1200);
+   }
+  };
+  renderHandler.postDelayed(renderProgressTask,1000);
+ }
+ private void stopProgressPolling(){
+  if(renderProgressTask!=null){renderHandler.removeCallbacks(renderProgressTask);renderProgressTask=null;}
+ }
+
+ private void reportExportError(ExportException exception,long start,long end,boolean audioOnly){
+  StringBuilder details=new StringBuilder();
+  details.append("Export failed. Error code: ").append(exception.errorCode).append("\n");
+  details.append("Message: ").append(exception.getMessage()).append("\n");
+  Throwable cause=exception.getCause();int level=0;
+  while(cause!=null&&level++<4){
+   details.append("Cause ").append(level).append(": ").append(cause.getClass().getSimpleName());
+   if(cause.getMessage()!=null)details.append(" — ").append(cause.getMessage());
+   details.append("\n");cause=cause.getCause();
+  }
+  details.append("Media type: ").append(audioOnly?"AUDIO ONLY":"VIDEO");
+  details.append("\nRange: ").append(CaptionSegment.timestamp(start)).append("–").append(CaptionSegment.timestamp(end));
+  details.append("\nPhone: ").append(android.os.Build.MODEL).append(" / Android ").append(android.os.Build.VERSION.RELEASE);
+  details.append("\nFree cache space: ").append(new StatFs(getCacheDir().getAbsolutePath()).getAvailableBytes()/1024/1024).append(" MB");
+  String diagnostic=details.toString();
+  android.util.Log.e("ShariAutoCut","Export diagnostic: "+diagnostic,exception);
+  status.setText("Export failed (code "+exception.errorCode+"). Use Copy Diagnostics below; try TEST EXPORT: First 15 Seconds.");
+  String advice=exception.errorCode==ExportException.ERROR_CODE_MUXING_TIMEOUT
+   ?"Muxer stopped receiving samples. Try exporting a 15-second sample or use a shorter section. A longer watchdog cannot repair a permanently stalled decoder."
+   :exception.errorCode==ExportException.ERROR_CODE_MUXING_FAILED
+   ?"Media muxer failed. Try the 15-second export; if that also fails, test another audio file (for example standard MP3/M4A) and check free storage."
+   :"Export pipeline failed. Note the code/cause and test a shorter segment.";
+  new AlertDialog.Builder(this)
+   .setTitle("MP4 export diagnostic")
+   .setMessage(advice+"\n\n"+diagnostic)
+   .setPositiveButton("Copy diagnostics",(dialog,which)->{
+    android.content.ClipboardManager clipboard=(android.content.ClipboardManager)getSystemService(CLIPBOARD_SERVICE);
+    clipboard.setPrimaryClip(android.content.ClipData.newPlainText("AutoCut export diagnostic",diagnostic));
+    Toast.makeText(this,"Details copied. Share them for targeted troubleshooting.",Toast.LENGTH_LONG).show();
+   })
+   .setNegativeButton("Close",null)
+   .show();
  }
  private Uri saveVideo(File src) throws Exception{
   String name="ShariAutoCut_"+System.currentTimeMillis()+".mp4";
@@ -376,8 +454,8 @@ public class MainActivity extends Activity {
   Intent i=new Intent(Intent.ACTION_SEND);i.setType("video/mp4");i.putExtra(Intent.EXTRA_STREAM,savedVideo);
   i.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION);startActivity(Intent.createChooser(i,"Share edited MP4"));
  }
- private void setBusy(boolean yes){busy=yes;if(transcribeButton!=null)transcribeButton.setEnabled(!yes);if(exportButton!=null)exportButton.setEnabled(!yes);if(autoButton!=null)autoButton.setEnabled(!yes);}
+ private void setBusy(boolean yes){busy=yes;if(transcribeButton!=null)transcribeButton.setEnabled(!yes);if(exportButton!=null)exportButton.setEnabled(!yes);if(testExportButton!=null)testExportButton.setEnabled(!yes);if(autoButton!=null)autoButton.setEnabled(!yes);}
  private void update(String message){if(status!=null)status.setText(message);}
  private void error(String message){update(message);Toast.makeText(this,message,Toast.LENGTH_LONG).show();}
- @Override protected void onDestroy(){if(preview!=null)preview.stopPlayback();jobs.shutdown();super.onDestroy();}
+ @Override protected void onDestroy(){stopProgressPolling();if(transformer!=null&&busy)transformer.cancel();if(preview!=null)preview.stopPlayback();jobs.shutdown();super.onDestroy();}
 }
