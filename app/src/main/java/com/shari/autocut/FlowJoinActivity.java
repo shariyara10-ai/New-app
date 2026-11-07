@@ -278,7 +278,7 @@ public final class FlowJoinActivity extends Activity {
     b.append("\n\nThis is technical media inspection, not object or semantic AI analysis.");
     report=b.toString();
    }catch(Exception e){report="Cannot inspect this media: "+e.getMessage();}
-   finally{r.release();}
+   finally{try{r.release();}catch(Exception ignored){}}
    final String response=report;
    runOnUiThread(()->{
     status.setText("Technical inspection complete.");
