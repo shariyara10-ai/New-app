@@ -1,4 +1,4 @@
-# Shari AutoCut Offline — Standalone Android v0.2
+# Shari AutoCut Offline — Standalone Android v0.2.1
 
 **This APK works on an Android phone without a PC, local server, OpenAI API, cloud account, or subscription.**
 
@@ -9,7 +9,7 @@ GitHub Actions branch: `shari-autocut-standalone`. Download the latest successfu
 
 ## First-run offline workflow
 1. Open the APK and tap **Choose Video / Audio**; select an MP4, M4A, MP3, etc. supported by Android codecs.
-2. For automatic transcription: tap **Open official Vosk models page** (opens your browser) and download either `vosk-model-small-en-us-0.15.zip` (English, ~40 MB) or `vosk-model-small-hi-0.22.zip` (Hindi, ~42 MB). Source: https://alphacephei.com/vosk/models — read each model license before use. After downloading, tap **Import downloaded Vosk model ZIP** and select the ZIP from Downloads. This only needs to be done once; recognition then runs offline.
+2. For automatic transcription: tap **Open official Vosk models page** (opens your browser) and download either `vosk-model-small-en-us-0.15.zip` (English, ~40 MB) or `vosk-model-small-hi-0.22.zip` (Hindi, ~42 MB). Source: https://alphacephei.com/vosk/models — read each model license before use. For easier setup tap **Download & install English model** or **Download & install Hindi model** within the app. English downloads are SHA-256 checked, other models have ZIP decompression integrity checks. Or import a downloaded original ZIP manually. If an imported file says 'invalid code lengths set', it is a corrupt/incomplete ZIP; delete the download and retry on stable Wi-Fi. Old installed model is retained if new ZIP installation fails. This only needs to be done once; recognition then runs offline.
 3. Tap **Transcribe selected audio OFFLINE**. The app uses Android MediaExtractor/MediaCodec to decode the selected recording, converts PCM to mono 16 kHz for Vosk, and receives word-timestamped JSON results. Long recordings may be slow; keep app open.
 4. Review and correct the captions. If no model is installed, paste your own script manually; timestamped format is `[00:00.00-00:02.20] Your sentence`. Plain text also works and gets evenly spaced segments.
 5. Tap **Plan caption motion** (local keyword rules: mystery, warning, numbers, titles and pop). Pick a style preset. You can generate text prompts for optional image assets; no images are generated or downloaded automatically.
@@ -27,3 +27,10 @@ GitHub Actions branch: `shari-autocut-standalone`. Download the latest successfu
 
 ## License / dependencies
 App sources are provided in this branch. AndroidX Media3 libraries: Apache 2.0; Vosk SDK: Apache 2.0, individual model licenses may differ. See their official project/license pages.
+
+## v0.2.1 repair
+- In-app official model download (English US, Hindi, Indian English) with size guard; checksum verification for English/Indian English; extraction CRC validation.
+- Corrupt/incomplete ZIP gives a readable recovery message instead of the Java inflater message.
+- Transactional model install: an invalid import cannot erase a working installed model.
+- Fixed dark-on-dark preset spinner labels and added system-bar insets for modern Pixel phones.
+- Internet permission is only needed for optional first-time model downloads; the speech recognition/editor stays local.

@@ -81,6 +81,10 @@ public class MainActivity extends Activity {
  private void showEditor(){
   ScrollView scroll=new ScrollView(this);scroll.setFillViewport(true);scroll.setBackgroundColor(bg);
   root=new LinearLayout(this);root.setOrientation(LinearLayout.VERTICAL);root.setPadding(d(16),d(25),d(16),d(30));scroll.addView(root);
+  scroll.setOnApplyWindowInsetsListener((v,insets)->{
+   scroll.setPadding(0,insets.getSystemWindowInsetTop(),0,insets.getSystemWindowInsetBottom());
+   return insets;
+  });
   setContentView(scroll);
   add(root,label("SHARI / AUTOCUT OFFLINE",13,aqua,true),0);
   add(root,label("AI-assisted Video Editor",26,Color.WHITE,true),7);
@@ -105,7 +109,10 @@ public class MainActivity extends Activity {
   add(model,modelStatus,7);
   Button getModels=btn("Open official Vosk models page");add(model,getModels,8);
   getModels.setOnClickListener(v->{Intent i=new Intent(Intent.ACTION_VIEW,Uri.parse("https://alphacephei.com/vosk/models"));startActivity(i);});
-  Button importModel=btn("Import downloaded Vosk model ZIP");add(model,importModel,7);importModel.setOnClickListener(v->choose("application/zip",PICK_MODEL));
+  Button downloadEnglish=btn("Download & install English model (~40 MB)");add(model,downloadEnglish,9);downloadEnglish.setOnClickListener(v->downloadModel("english"));
+  Button downloadHindi=btn("Download & install Hindi model (~42 MB)");add(model,downloadHindi,7);downloadHindi.setOnClickListener(v->downloadModel("hindi"));
+  Button downloadIndian=btn("Download & install Indian English model (~36 MB)");add(model,downloadIndian,7);downloadIndian.setOnClickListener(v->downloadModel("indian_english"));
+  Button importModel=btn("Or import existing Vosk model ZIP");add(model,importModel,9);importModel.setOnClickListener(v->choose("application/zip",PICK_MODEL));
   transcribeButton=btn("Transcribe selected audio OFFLINE");add(model,transcribeButton,9);transcribeButton.setOnClickListener(v->transcribe());
   add(model,label("Use small English or Hindi Vosk models. Urdu has no matching small-model guarantee. Hinglish code-switching and Roman spelling may be inaccurate; always correct captions.",12,Color.rgb(164,178,196),false),11);
 
@@ -117,20 +124,32 @@ public class MainActivity extends Activity {
   transcript.setBackgroundColor(Color.rgb(32,43,62));transcript.setPadding(d(12),d(12),d(12),d(12));add(edit,transcript,10);
   Button romanize=btn("Approx. Romanize Urdu/Hindi → Latin");add(edit,romanize,9);romanize.setOnClickListener(v->romanizeText());
   add(edit,label("Auto planner style",12,Color.rgb(176,194,213),true),11);
-  preset=new Spinner(this);preset.setAdapter(new ArrayAdapter<String>(this,android.R.layout.simple_spinner_dropdown_item,new String[]{"Documentary","Shorts","Explainer"}));add(edit,preset,6);
+  preset=new Spinner(this);preset.setAdapter(spinnerAdapter(new String[]{"Documentary","Shorts","Explainer"}));add(edit,preset,6);
   autoButton=btn("Plan caption motion from transcript");add(edit,autoButton,8);autoButton.setOnClickListener(v->plan());
   Button prompt=btn("Generate visual/PNG asset prompts");add(edit,prompt,8);prompt.setOnClickListener(v->showPrompts());
   Button png=btn("Add one optional PNG overlay image");add(edit,png,8);png.setOnClickListener(v->choose("image/png",PICK_PNG));
 
   LinearLayout out=panel();
   add(out,label("4  Export video on this phone",17,Color.WHITE,true),0);
-  format=new Spinner(this);format.setAdapter(new ArrayAdapter<String>(this,android.R.layout.simple_spinner_dropdown_item,new String[]{"9:16 Shorts • 720×1280 target","16:9 YouTube • 1280×720 target","1:1 Square"}));add(out,format,10);
+  format=new Spinner(this);format.setAdapter(spinnerAdapter(new String[]{"9:16 Shorts • 720×1280 target","16:9 YouTube • 1280×720 target","1:1 Square"}));add(out,format,10);
   exportButton=btn("Render and save MP4 to Gallery");add(out,exportButton,10);exportButton.setOnClickListener(v->export());
   Button share=btn("Share last export");add(out,share,6);share.setOnClickListener(v->shareExport());
   progress=new ProgressBar(this,null,android.R.attr.progressBarStyleHorizontal);progress.setMax(100);add(out,progress,9);
   status=label("Ready. Import a media file; paste transcript or add an offline speech model.",13,Color.rgb(191,211,226),false);add(out,status,9);
   add(root,label("Local processing: Media3 Transformer + Vosk. Rule-based caption styles, not a cloud LLM. This experimental release may fail on unsupported codecs and large videos.",12,Color.rgb(146,161,182),false),22);
   refreshModel();
+ }
+ private ArrayAdapter<String> spinnerAdapter(String[] items){
+  return new ArrayAdapter<String>(this,android.R.layout.simple_spinner_item,items){
+   @Override public View getView(int position,View reused,android.view.ViewGroup parent){
+    TextView t=(TextView)super.getView(position,reused,parent);
+    t.setTextColor(Color.WHITE);t.setTextSize(15);return t;
+   }
+   @Override public View getDropDownView(int position,View reused,android.view.ViewGroup parent){
+    TextView t=(TextView)super.getDropDownView(position,reused,parent);
+    t.setTextColor(Color.BLACK);t.setTextSize(15);return t;
+   }
+  };
  }
  private EditText smallField(String hint,String value){
   EditText e=new EditText(this);e.setSingleLine(true);e.setHint(hint);e.setText(value);
@@ -184,11 +203,34 @@ public class MainActivity extends Activity {
    update("PNG image selected. Overlay will appear at top-right while captions display.");
   }catch(Exception e){error("PNG import failed: "+e.getMessage());}
  }
+ private void downloadModel(String language){
+  if(busy)return;
+  setBusy(true);
+  modelStatus.setText("Downloading model from official Vosk website...");
+  update("Downloading model; keep this app open and use a stable connection.");
+  jobs.execute(()->{
+   try{
+    File m=ModelImporter.downloadAndInstall(this,language,p->runOnUiThread(()->{
+     if(modelStatus!=null)modelStatus.setText("Downloading official "+language+" model: "+p+"%");
+     if(progress!=null)progress.setProgress(p);
+    }));
+    runOnUiThread(()->{
+     setBusy(false);refreshModel();update("Model download verified and installed. Now tap Transcribe selected audio OFFLINE.");
+     if(progress!=null)progress.setProgress(100);
+    });
+   }catch(Exception e){
+    runOnUiThread(()->{
+     setBusy(false);refreshModel();
+     error("Model download failed: "+e.getMessage());
+    });
+   }
+  });
+ }
  private void importModel(Uri u){
-  if(busy)return;setBusy(true);update("Extracting Vosk model ZIP on phone...");
+  if(busy)return;setBusy(true);update("Validating and extracting Vosk model ZIP on phone...");
   jobs.execute(()->{
    try{File m=ModelImporter.install(this,u);runOnUiThread(()->{setBusy(false);refreshModel();update("Offline model ready: "+m.getName());});}
-   catch(Exception e){runOnUiThread(()->{setBusy(false);error("Model import failed: "+e.getMessage());});}
+   catch(Exception e){runOnUiThread(()->{setBusy(false);refreshModel();error("Model import failed: "+e.getMessage());});}
   });
  }
  private void refreshModel(){if(modelStatus!=null){File f=ModelImporter.active(this);modelStatus.setText(f==null?"No offline model. Download small English/Hindi ZIP from official page, then import.":"Installed offline model: "+f.getName()+" • transcription ready.");}}
