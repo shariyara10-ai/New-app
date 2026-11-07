@@ -1,17 +1,15 @@
 plugins {
     id 'com.android.application'
 }
-
 android {
-    namespace 'com.shari.ttsstudio'
+    namespace 'com.shari.autocut'
     compileSdk 35
-
     defaultConfig {
-        applicationId 'com.shari.ttsstudio'
+        applicationId 'com.shari.autocut'
         minSdk 29
         targetSdk 35
         versionCode 1
-        versionName '1.0.0'
+        versionName '0.1.0'
     }
     compileOptions {
         sourceCompatibility JavaVersion.VERSION_17
