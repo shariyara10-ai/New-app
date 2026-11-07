@@ -52,7 +52,7 @@ import java.util.concurrent.Executors;
 @androidx.media3.common.util.UnstableApi
 public class MainActivity extends Activity {
  private static final int PICK_MEDIA=15,PICK_MODEL=16,PICK_PNG=17;
- private final int bg=Color.rgb(9,15,29),card=Color.rgb(22,31,48),aqua=Color.rgb(42,167,226);
+ private final int bg=Color.rgb(248,250,255),card=Color.WHITE,aqua=Color.rgb(72,91,245),ink=Color.rgb(24,33,57),muted=Color.rgb(99,112,137);
  private final ExecutorService jobs=Executors.newSingleThreadExecutor();
  private Uri source;
  private boolean isAudioOnly=false;
@@ -73,15 +73,31 @@ public class MainActivity extends Activity {
  private boolean busy=false;
  private LinearLayout root;
  private int d(float n){return Math.round(n*getResources().getDisplayMetrics().density);}
- @Override public void onCreate(Bundle b){super.onCreate(b);getWindow().setStatusBarColor(bg);getWindow().setNavigationBarColor(bg);showEditor();}
+ @Override public void onCreate(Bundle b){
+  super.onCreate(b);getWindow().setStatusBarColor(bg);getWindow().setNavigationBarColor(bg);
+  getWindow().getDecorView().setSystemUiVisibility(View.SYSTEM_UI_FLAG_LIGHT_STATUS_BAR|View.SYSTEM_UI_FLAG_LIGHT_NAVIGATION_BAR);
+  showEditor();
+ }
  private TextView label(String msg,int size,int color,boolean bold) {
-  TextView v=new TextView(this);v.setText(msg);v.setTextColor(color);v.setTextSize(size);
+  TextView v=new TextView(this);v.setText(msg);v.setTextSize(size);
+  int resolved=color==Color.WHITE?ink:color==aqua?aqua:(Color.red(color)+Color.green(color)+Color.blue(color)>390?muted:color);
+  v.setTextColor(resolved);
   if(bold)v.setTypeface(null,android.graphics.Typeface.BOLD);return v;
  }
- private Button btn(String text){Button b=new Button(this);b.setText(text);b.setAllCaps(false);b.setTextSize(13);b.setTextColor(Color.WHITE);b.setBackgroundTintList(android.content.res.ColorStateList.valueOf(aqua));return b;}
+ private Button btn(String text){
+  Button b=new Button(this);b.setText(text);b.setAllCaps(false);b.setTextSize(13);b.setMinHeight(d(51));
+  b.setTypeface(android.graphics.Typeface.create("sans-serif-medium",android.graphics.Typeface.NORMAL));
+  b.setTextColor(Color.WHITE);
+  android.graphics.drawable.GradientDrawable shape=new android.graphics.drawable.GradientDrawable();
+  shape.setColor(aqua);shape.setCornerRadius(d(14));b.setBackground(shape);b.setElevation(0);
+  return b;
+ }
  private void add(LinearLayout target,View v,int top){LinearLayout.LayoutParams p=new LinearLayout.LayoutParams(-1,-2);p.topMargin=d(top);target.addView(v,p);}
  private LinearLayout panel(){
-  LinearLayout p=new LinearLayout(this);p.setPadding(d(14),d(14),d(14),d(17));p.setOrientation(LinearLayout.VERTICAL);p.setBackgroundColor(card);add(root,p,15);return p;
+  LinearLayout p=new LinearLayout(this);p.setPadding(d(17),d(17),d(17),d(20));p.setOrientation(LinearLayout.VERTICAL);
+  android.graphics.drawable.GradientDrawable white=new android.graphics.drawable.GradientDrawable();
+  white.setColor(card);white.setCornerRadius(d(22));white.setStroke(d(1),Color.rgb(230,235,245));
+  p.setBackground(white);p.setElevation(d(1));add(root,p,15);return p;
  }
  private void showEditor(){
   ScrollView scroll=new ScrollView(this);scroll.setFillViewport(true);scroll.setBackgroundColor(bg);
@@ -91,7 +107,9 @@ public class MainActivity extends Activity {
    return insets;
   });
   setContentView(scroll);
-  add(root,label("CINEZEHN / AI STUDIO",13,aqua,true),0);
+  Button home=btn("‹  Back to CineZehn Dashboard");add(root,home,0);
+  home.setOnClickListener(v->finish());
+  add(root,label("CINEZEHN / SINGLE VIDEO STUDIO",13,aqua,true),18);
   add(root,label("AI Director + Video Editor",26,Color.WHITE,true),7);
   add(root,label("100% phone-based media editing. No desktop server, account or API key required. Offline Vosk model imported separately.",13,Color.rgb(177,191,210),false),9);
   LinearLayout flow=panel();
@@ -140,10 +158,10 @@ public class MainActivity extends Activity {
 
   LinearLayout edit=panel();
   add(edit,label("3  Transcript & caption timeline",17,Color.WHITE,true),0);
-  transcript=new EditText(this);transcript.setTextColor(Color.WHITE);transcript.setHintTextColor(Color.GRAY);transcript.setTextSize(14);
+  transcript=new EditText(this);transcript.setTextColor(ink);transcript.setHintTextColor(muted);transcript.setTextSize(14);
   transcript.setHint("[00:00.00-00:02.20] Your first sentence\n[00:02.20-00:04.70] Your second sentence\n\nOr paste plain text.");
   transcript.setMinLines(6);transcript.setGravity(Gravity.TOP|Gravity.START);transcript.setInputType(InputType.TYPE_CLASS_TEXT|InputType.TYPE_TEXT_FLAG_MULTI_LINE|InputType.TYPE_TEXT_FLAG_CAP_SENTENCES);
-  transcript.setBackgroundColor(Color.rgb(32,43,62));transcript.setPadding(d(12),d(12),d(12),d(12));add(edit,transcript,10);
+  transcript.setBackgroundColor(Color.rgb(242,245,252));transcript.setPadding(d(12),d(12),d(12),d(12));add(edit,transcript,10);
   Button romanize=btn("Approx. Romanize Urdu/Hindi → Latin");add(edit,romanize,9);romanize.setOnClickListener(v->romanizeText());
   add(edit,label("Auto planner style",12,Color.rgb(176,194,213),true),11);
   preset=new Spinner(this);preset.setAdapter(spinnerAdapter(DirectorEngine.STYLES));add(edit,preset,6);
@@ -169,7 +187,7 @@ public class MainActivity extends Activity {
   return new ArrayAdapter<String>(this,android.R.layout.simple_spinner_item,items){
    @Override public View getView(int position,View reused,android.view.ViewGroup parent){
     TextView t=(TextView)super.getView(position,reused,parent);
-    t.setTextColor(Color.WHITE);t.setTextSize(15);return t;
+    t.setTextColor(ink);t.setTextSize(15);return t;
    }
    @Override public View getDropDownView(int position,View reused,android.view.ViewGroup parent){
     TextView t=(TextView)super.getDropDownView(position,reused,parent);
@@ -179,9 +197,9 @@ public class MainActivity extends Activity {
  }
  private EditText smallField(String hint,String value){
   EditText e=new EditText(this);e.setSingleLine(true);e.setHint(hint);e.setText(value);
-  e.setTextColor(Color.WHITE);e.setTextSize(14);e.setPadding(d(8),0,d(8),0);
+  e.setTextColor(ink);e.setTextSize(14);e.setPadding(d(8),0,d(8),0);
   e.setInputType(InputType.TYPE_CLASS_NUMBER|InputType.TYPE_NUMBER_FLAG_DECIMAL);
-  e.setBackgroundColor(Color.rgb(35,48,67));return e;
+  e.setBackgroundColor(Color.rgb(241,245,251));return e;
  }
  private void choose(String mime,int request) {
   Intent i=new Intent(Intent.ACTION_OPEN_DOCUMENT);

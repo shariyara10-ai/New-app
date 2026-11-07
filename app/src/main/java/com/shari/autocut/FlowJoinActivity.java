@@ -23,6 +23,7 @@ import org.json.*;
 public final class FlowJoinActivity extends Activity {
  private static final int REQUEST_CLIPS=71;
  private final ArrayList<FlowScene> scenes=new ArrayList<>();
+ private final int PRIMARY=Color.rgb(72,91,245),INK=Color.rgb(25,35,58),SECONDARY=Color.rgb(95,112,141),PAGE=Color.rgb(248,250,255);
  private final ExecutorService io=Executors.newSingleThreadExecutor();
  private final Handler handler=new Handler(Looper.getMainLooper());
  private LinearLayout root, list;
@@ -42,27 +43,47 @@ public final class FlowJoinActivity extends Activity {
  private Uri saved;
  private int dp(int n){return Math.round(n*getResources().getDisplayMetrics().density);}
  private TextView title(String s,int sz,boolean b){
-  TextView t=new TextView(this);t.setText(s);t.setTextSize(sz);t.setTextColor(b?Color.BLACK:Color.DKGRAY);
+  TextView t=new TextView(this);t.setText(s);t.setTextSize(sz);t.setTextColor(b?INK:SECONDARY);
   if(b)t.setTypeface(null,Typeface.BOLD);return t;
  }
- private Button button(String s){Button b=new Button(this);b.setAllCaps(false);b.setText(s);return b;}
+ private android.graphics.drawable.GradientDrawable rounded(int color,int radius,int stroke){
+  android.graphics.drawable.GradientDrawable bg=new android.graphics.drawable.GradientDrawable();
+  bg.setColor(color);bg.setCornerRadius(dp(radius));if(stroke!=0)bg.setStroke(dp(1),stroke);return bg;
+ }
+ private Button button(String s){
+  Button b=new Button(this);b.setAllCaps(false);b.setText(s);b.setTextSize(12);
+  boolean primary=s.contains("RENDER")||s.contains("Select multiple")||s.contains("TEST EXPORT");
+  b.setTextColor(primary?Color.WHITE:INK);
+  b.setTypeface(Typeface.create("sans-serif-medium",Typeface.NORMAL));
+  b.setBackground(rounded(primary?PRIMARY:Color.rgb(237,241,252),13,0));
+  b.setMinHeight(dp(48));b.setElevation(0);return b;
+ }
  private void add(LinearLayout p,View v){p.addView(v,new LinearLayout.LayoutParams(-1,-2));}
  private LinearLayout panel(String heading){
   LinearLayout p=new LinearLayout(this);p.setOrientation(LinearLayout.VERTICAL);
-  p.setPadding(dp(13),dp(14),dp(13),dp(15));
-  p.setBackgroundColor(Color.rgb(245,246,248));
+  p.setPadding(dp(16),dp(17),dp(16),dp(18));
+  p.setBackground(rounded(Color.WHITE,21,Color.rgb(231,236,245)));p.setElevation(dp(1));
   LinearLayout.LayoutParams lp=new LinearLayout.LayoutParams(-1,-2);
   lp.topMargin=dp(13);root.addView(p,lp);add(p,title(heading,17,true));return p;
  }
  @Override public void onCreate(Bundle savedState){
   super.onCreate(savedState);getWindow().setStatusBarColor(Color.WHITE);
   getWindow().getDecorView().setSystemUiVisibility(View.SYSTEM_UI_FLAG_LIGHT_STATUS_BAR);
-  ScrollView sc=new ScrollView(this);sc.setFillViewport(true);sc.setBackgroundColor(Color.WHITE);
+  ScrollView sc=new ScrollView(this);sc.setFillViewport(true);sc.setBackgroundColor(PAGE);
   root=new LinearLayout(this);root.setOrientation(LinearLayout.VERTICAL);root.setPadding(dp(16),dp(22),dp(16),dp(30));
   sc.addView(root);sc.setOnApplyWindowInsetsListener((v,i)->{sc.setPadding(0,i.getSystemWindowInsetTop(),0,i.getSystemWindowInsetBottom());return i;});
   setContentView(sc);
-  add(root,title("CINEZEHN / AI STUDIO",12,false));add(root,title("Flow Scene Joiner",27,true));
-  add(root,title("Offline multi-clip editor: sequence, trim, caption and style your Flow/Veo videos. Review before publishing. No cloud AI model is bundled.",13,false));
+  LinearLayout hero=new LinearLayout(this);hero.setOrientation(LinearLayout.VERTICAL);
+  hero.setPadding(dp(21),dp(21),dp(21),dp(23));
+  android.graphics.drawable.GradientDrawable hg=new android.graphics.drawable.GradientDrawable(
+    android.graphics.drawable.GradientDrawable.Orientation.TL_BR,
+    new int[]{Color.rgb(48,69,207),Color.rgb(116,77,224)});
+  hg.setCornerRadius(dp(24));hero.setBackground(hg);
+  TextView eyebrow=title("CINEZEHN  /  CREATOR PRO",11,true);eyebrow.setTextColor(Color.rgb(216,221,255));
+  add(hero,eyebrow);
+  TextView heading=title("Flow Scene Studio",26,true);heading.setTextColor(Color.WHITE);add(hero,heading);
+  TextView desc=title("Import clips  •  Clean cuts  •  Captions  •  Offline motion graphics",13,false);
+  desc.setTextColor(Color.rgb(229,229,255));add(hero,desc);add(root,hero);
   LinearLayout input=panel("1  Select videos");
   Button pick=button("Select multiple Flow clips");add(input,pick);pick.setOnClickListener(v->select());
   summary=title("No clips selected",13,false);add(input,summary);
@@ -168,7 +189,13 @@ public final class FlowJoinActivity extends Activity {
   for(int j=0;j<scenes.size();j++){
    final int idx=j;FlowScene s=scenes.get(j);total+=s.editingDurationMs();if(s.hasAudio)aud++;
    LinearLayout l=new LinearLayout(this);l.setOrientation(LinearLayout.VERTICAL);l.setPadding(dp(4),dp(8),dp(4),dp(8));add(list,l);
-   add(l,title((j+1)+". "+s.fileName+" • "+String.format(Locale.US,"%.1fs",s.editingDurationMs()/1000f)+(s.hasAudio?" • Voice/audio":" • Silent"),12,true));
+   LinearLayout mediaRow=new LinearLayout(this);mediaRow.setGravity(Gravity.CENTER_VERTICAL);add(l,mediaRow);
+   ImageView thumbnail=new ImageView(this);thumbnail.setScaleType(ImageView.ScaleType.CENTER_CROP);
+   thumbnail.setBackground(rounded(Color.rgb(22,33,54),10,0));
+   mediaRow.addView(thumbnail,new LinearLayout.LayoutParams(dp(78),dp(53)));
+   TextView name=title((j+1)+". "+s.fileName+"\n"+String.format(Locale.US,"%.1fs",s.editingDurationMs()/1000f)+(s.hasAudio?"  ·  Audio":"  ·  Silent"),12,true);
+   name.setPadding(dp(11),0,0,0);mediaRow.addView(name,new LinearLayout.LayoutParams(0,-2,1));
+   showThumbnail(s,thumbnail);
    LinearLayout actions=new LinearLayout(this);actions.setOrientation(LinearLayout.HORIZONTAL);add(l,actions);
    Button play=button("Preview"),up=button("↑"),down=button("↓"),remove=button("✕");
    for(Button b:new Button[]{play,up,down,remove})actions.addView(b,new LinearLayout.LayoutParams(0,dp(43),1));
@@ -412,6 +439,20 @@ public final class FlowJoinActivity extends Activity {
   }catch(FileNotFoundException ignored){}catch(Exception e){status.setText("Saved project could not be restored: "+e.getMessage());}
  }
 
+ private void showThumbnail(FlowScene scene, ImageView view){
+  io.execute(()->{
+   Bitmap bitmap=null;
+   MediaMetadataRetriever retriever=new MediaMetadataRetriever();
+   try{
+    retriever.setDataSource(this,scene.uri);
+    bitmap=retriever.getScaledFrameAtTime(scene.trimStartMs*1000+100000L,
+     MediaMetadataRetriever.OPTION_CLOSEST_SYNC,160,100);
+   }catch(Exception ignored){}
+   finally{try{retriever.release();}catch(Exception ignored){}}
+   Bitmap ready=bitmap;
+   if(ready!=null)runOnUiThread(()->{if(!isFinishing())view.setImageBitmap(ready);});
+  });
+ }
  private File bgImage()throws Exception{
   int w=720,h=1280;
   if(!scenes.isEmpty()){
