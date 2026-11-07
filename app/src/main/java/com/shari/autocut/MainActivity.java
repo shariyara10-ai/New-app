@@ -268,7 +268,7 @@ public class MainActivity extends Activity {
   ArrayList<CaptionSegment> parsed=parsed();
   if(parsed.isEmpty()){error("Enter transcript with timestamp lines, or paste plain text.");return;}
   scenes=parsed;AutoPlanner.apply(scenes,presetValue());
-  update("Motion plan created for "+scenes.size()+" captions. Rule-based keyword classification, not generative AI.");
+  update("Caption motion ready. The asset-prompt tool now groups nearby captions into broader ~30-second visual beats, not one PNG for every sentence.");
  }
  private void showPrompts(){
   plan();if(scenes.isEmpty())return;

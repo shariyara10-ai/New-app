@@ -6,8 +6,8 @@ android {
   applicationId 'com.shari.autocut.offline'
   minSdk 29
   targetSdk 35
-  versionCode 3
-  versionName '0.2.1-offline'
+  versionCode 4
+  versionName '0.2.2-offline'
  }
  compileOptions {
   sourceCompatibility JavaVersion.VERSION_17
