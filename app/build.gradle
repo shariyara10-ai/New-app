@@ -3,11 +3,11 @@ android {
  namespace 'com.shari.autocut'
  compileSdk 36
  defaultConfig {
-  applicationId 'com.shari.autocut.offline'
+  applicationId 'com.cinezehn.aistudio'
   minSdk 29
   targetSdk 35
-  versionCode 9
-  versionName '0.4.0-pro-beta'
+  versionCode 10
+  versionName '0.4.1-independent-install'
  }
  compileOptions {
   sourceCompatibility JavaVersion.VERSION_17

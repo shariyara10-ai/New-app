@@ -1,8 +1,13 @@
-# CineZehn AI Studio — Android Creator PRO Beta v0.4.0
+# CineZehn AI Studio — Android Creator PRO Beta v0.4.1
 
 **This APK works on an Android phone without a PC, local server, OpenAI API, cloud account, or subscription.**
 
 Native Android app: media files from device storage, video preview, editable time-coded captions, offline speech recognition with a user-installed Vosk model, rule-based motion style planning, animated burned-in captions, optional imported PNG sticker, trim/crop, Media3 Transformer encoding, audio-only narration to captioned video, MP4 saved into Movies/CineZehn.
+
+## v0.4.1 independent installation / launcher recovery
+- Android `applicationId` changed from `com.shari.autocut.offline` to `com.cinezehn.aistudio`, so the new CineZehn APK installs alongside the older AutoCut package rather than updating it.
+- Dedicated visible vector launcher icon is provided; the app retains MAIN/LAUNCHER intent-filter.
+- Important: The old package's private projects, imported models, and settings are **not** automatically migrated to the new application ID. The old APK need not be uninstalled. Videos already exported to Movies/CineZehn stay in shared storage.
 
 ## New in v0.4.0 — Flow/Veo Creator Studio
 - Multi-select videos, reorder, preview, remove and **trim** clips without modifying the originals.
