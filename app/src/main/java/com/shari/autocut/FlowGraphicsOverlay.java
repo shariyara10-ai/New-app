@@ -17,20 +17,23 @@ import java.util.Locale;
 public final class FlowGraphicsOverlay extends CanvasOverlay {
  private final List<FlowScene> items;
  private final String style;
- private final boolean graphics,captions,host;
+ private final boolean graphics,captions,host,reaction;
  private final Paint p=new Paint(3);
  private final TextPaint type=new TextPaint(3);
  private final ArrayList<StaticLayout> captionLayouts=new ArrayList<>();
  private long totalDurationMs;
  public FlowGraphicsOverlay(List<FlowScene> scenes,String style){
-  this(scenes,style,true,true,false);
+  this(scenes,style,true,true,false,false);
  }
  public FlowGraphicsOverlay(List<FlowScene> scenes,String style,boolean graphics,boolean captions){
-  this(scenes,style,graphics,captions,false);
+  this(scenes,style,graphics,captions,false,false);
  }
  public FlowGraphicsOverlay(List<FlowScene> scenes,String style,boolean graphics,boolean captions,boolean host){
+  this(scenes,style,graphics,captions,host,false);
+ }
+ public FlowGraphicsOverlay(List<FlowScene> scenes,String style,boolean graphics,boolean captions,boolean host,boolean reaction){
   super(true);
-  items=new ArrayList<>(scenes);this.style=style;this.graphics=graphics;this.captions=captions;this.host=host;
+  items=new ArrayList<>(scenes);this.style=style;this.graphics=graphics;this.captions=captions;this.host=host;this.reaction=reaction;
   for(FlowScene s:items)totalDurationMs+=s.editingDurationMs();
  }
  private int color(){
@@ -48,7 +51,7 @@ public final class FlowGraphicsOverlay extends CanvasOverlay {
  }
  @Override public void onDraw(Canvas c,long presentationTimeUs){
   long t=Math.max(0,presentationTimeUs/1000);
-  if(items.isEmpty()||t>=totalDurationMs||(!graphics&&!captions&&!host))return;
+  if(items.isEmpty()||t>=totalDurationMs||(!graphics&&!captions&&!host&&!reaction))return;
   long from=0;int idx=0;
   while(idx<items.size()-1 && t>=from+items.get(idx).editingDurationMs()){from+=items.get(idx).editingDurationMs();idx++;}
   FlowScene s=items.get(idx);
@@ -101,6 +104,7 @@ public final class FlowGraphicsOverlay extends CanvasOverlay {
   p.setStyle(Paint.Style.FILL);
   }
   if(host) AvatarPainter.draw(c,inScene,s,style);
+  if(reaction) ReactionPainter.draw(c,inScene,s);
   if(!captions)return;
   String activeText=s.caption==null?"":s.caption.trim();
   if(!s.subtitles.isEmpty()){
