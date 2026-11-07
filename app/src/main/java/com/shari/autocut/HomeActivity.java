@@ -148,6 +148,7 @@ public final class HomeActivity extends Activity {
   featureCard("▶","Single Video & Voiceover","Edit MP4/audio, transcribe with an installed speech model, add PNG and burned-in captions.","Open single-video studio",()->startActivity(new Intent(this,MainActivity.class)));
   featureCard("✧","Offline Creative Director","Give a natural-language instruction; receive a local rule-based editing plan you can apply to a Flow project.","Open AI Director",()->display(2));
   featureCard("◈","Motion & Asset Library","Browse installed procedural presets, styles and animated original graphics.","Explore library",()->display(3));
+  featureCard("✂","Offline Silence Cutter","Analyze audio volume, remove long quiet gaps and export a new MP4/M4A without changing your original.","Open silence cutter",()->startActivity(new Intent(this,SilenceCutActivity.class)));
   quickStatus();
  }
  private void quickStatus(){
@@ -164,6 +165,7 @@ public final class HomeActivity extends Activity {
   featureCard("▶","Video & Audio Editor","Single video, voiceover, captions, optional PNG, duration trim, 15-second diagnostic and Gallery export.","Open editor",()->startActivity(new Intent(this,MainActivity.class)));
   featureCard("◍","Offline Voice & Caption Tools","Import a Vosk ZIP, transcribe a selected audio/video clip, approximate Romanization and correct subtitles manually.","Open transcription tools",()->startActivity(new Intent(this,MainActivity.class)));
   featureCard("⌁","Cinematic Effects Library","Animated scene numbering, context graphics, highlighted text, intro/outro and 12 story styles.","See real effect options",()->display(3));
+  featureCard("✂","Silence & Pauses","Offline energy analysis to identify quiet sections, adjustable sensitivity, non-destructive clipping and export.","Open silence cutter",()->startActivity(new Intent(this,SilenceCutActivity.class)));
   add(content,text("Coming later: reliable semantic LLM reasoning, photorealistic avatars, 3D gesture rigs, online asset research and automatic meme downloads. These are not in this APK.",12,false,secondary()),18);
  }
  private void director(){
