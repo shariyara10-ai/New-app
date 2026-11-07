@@ -17,14 +17,18 @@ import java.util.Locale;
 public final class FlowGraphicsOverlay extends CanvasOverlay {
  private final List<FlowScene> items;
  private final String style;
+ private final boolean graphics,captions;
  private final Paint p=new Paint(3);
  private final TextPaint type=new TextPaint(3);
  private final ArrayList<StaticLayout> captionLayouts=new ArrayList<>();
  private long totalDurationMs;
  public FlowGraphicsOverlay(List<FlowScene> scenes,String style){
+  this(scenes,style,true,true);
+ }
+ public FlowGraphicsOverlay(List<FlowScene> scenes,String style,boolean graphics,boolean captions){
   super(true);
-  items=new ArrayList<>(scenes);this.style=style;
-  for(FlowScene s:items)totalDurationMs+=s.durationMs;
+  items=new ArrayList<>(scenes);this.style=style;this.graphics=graphics;this.captions=captions;
+  for(FlowScene s:items)totalDurationMs+=s.editingDurationMs();
  }
  private int color(){
   switch(style){
@@ -41,16 +45,17 @@ public final class FlowGraphicsOverlay extends CanvasOverlay {
  }
  @Override public void onDraw(Canvas c,long presentationTimeUs){
   long t=Math.max(0,presentationTimeUs/1000);
+  if(items.isEmpty()||t>=totalDurationMs||(!graphics&&!captions))return;
   long from=0;int idx=0;
-  while(idx<items.size()-1 && t>=from+items.get(idx).durationMs){from+=items.get(idx).durationMs;idx++;}
-  if(items.isEmpty())return;
+  while(idx<items.size()-1 && t>=from+items.get(idx).editingDurationMs()){from+=items.get(idx).editingDurationMs();idx++;}
   FlowScene s=items.get(idx);
   long inScene=t-from;
   float w=c.getWidth(),h=c.getHeight(),u=Math.max(.35f,Math.min(w/720f,h/1280f));
   float entrance=Math.min(1f,inScene/370f);
-  float exit=Math.min(1f,Math.max(0,s.durationMs-inScene)/300f);
+  float exit=Math.min(1f,Math.max(0,s.editingDurationMs()-inScene)/300f);
   float appear=Math.max(0,Math.min(entrance,exit));
   int accent=color();
+  if(graphics) {
   // Thin animated timeline across top; independent of screen ratio.
   p.setStyle(Paint.Style.FILL);p.setColor(Color.argb(120,16,20,26));
   c.drawRect(0,0,w,Math.max(5f,7f*u),p);
@@ -91,14 +96,23 @@ public final class FlowGraphicsOverlay extends CanvasOverlay {
    c.drawPath(triangle,p);
   }
   p.setStyle(Paint.Style.FILL);
-  if(s.caption==null || s.caption.trim().isEmpty())return;
+  }
+  if(!captions)return;
+  String activeText=s.caption==null?"":s.caption.trim();
+  if(!s.subtitles.isEmpty()){
+   activeText="";
+   long position=s.trimStartMs+inScene;
+   for(CaptionSegment sub:s.subtitles)
+    if(sub.startMs<=position&&position<sub.endMs){activeText=sub.text;break;}
+  }
+  if(activeText.isEmpty())return;
   float captionAt=h*.79f;
   float space=w*.86f;
   type.setTypeface(android.graphics.Typeface.create("sans-serif",android.graphics.Typeface.BOLD));
   type.setTextSize(46*u);type.setColor(Color.WHITE);
   int maxWidth=Math.max(100,(int)space);
   // Build dynamic text layout for bi-directional Urdu/English captions.
-  StaticLayout layout=StaticLayout.Builder.obtain(s.caption,0,s.caption.length(),type,maxWidth)
+  StaticLayout layout=StaticLayout.Builder.obtain(activeText,0,activeText.length(),type,maxWidth)
    .setAlignment(Layout.Alignment.ALIGN_CENTER).setIncludePad(false).setMaxLines(3).build();
   float ch=layout.getHeight();
   float top=Math.min(h-25*u-ch,captionAt-ch/2f);
