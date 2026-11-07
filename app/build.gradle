@@ -1,7 +1,7 @@
 plugins { id 'com.android.application' }
 android {
  namespace 'com.shari.autocut'
- compileSdk 35
+ compileSdk 36
  defaultConfig {
   applicationId 'com.shari.autocut.offline'
   minSdk 29
