@@ -1,8 +1,19 @@
-# CineZehn AI Studio — Standalone Android v0.3.2
+# CineZehn AI Studio — Android Creator PRO Beta v0.4.0
 
 **This APK works on an Android phone without a PC, local server, OpenAI API, cloud account, or subscription.**
 
 Native Android app: media files from device storage, video preview, editable time-coded captions, offline speech recognition with a user-installed Vosk model, rule-based motion style planning, animated burned-in captions, optional imported PNG sticker, trim/crop, Media3 Transformer encoding, audio-only narration to captioned video, MP4 saved into Movies/CineZehn.
+
+## New in v0.4.0 — Flow/Veo Creator Studio
+- Multi-select videos, reorder, preview, remove and **trim** clips without modifying the originals.
+- Burn in **editable per-scene timed captions**, or transcribe a specific clip offline using a separately downloaded Vosk model; export an aligned **SRT** file.
+- Choose 12 category styling presets and a local, deterministic editing-recipe director. **Not a local ChatGPT/LLM**.
+- Animated procedural scene graphics and captions, toggled independently, rendered with Media3 composition-wide effects.
+- Output framing for **9:16 Shorts**, **16:9**, **1:1**, or original frame; choose safe fit or center-crop.
+- Save and restore the most recent project on device, retaining user-approved source URI access.
+- Technical scene inspection (metadata, source audio, brightness sampling) and optional animated outro.
+- 15-second export check, cancel render, MP4 save into Movies/CineZehn, share last export.
+- Honest boundaries: This beta DOES NOT implement an offline reasoning model, AI-generated stock footage, semantic object recognition, RNNoise, lip-synced 3D avatars, automatic meme clip discovery, or full timeline editing. Scene analysis is technical, not semantic. Device-specific export behavior still requires testing.
 
 ## Build
 GitHub Actions branch: `shari-autocut-standalone`. Download the latest successful run artifact named `CineZehn-AI-Studio-Android-APK` and install `app-debug.apk` after extracting. Target: Android 10+ (API 29+). No Play Store needed.

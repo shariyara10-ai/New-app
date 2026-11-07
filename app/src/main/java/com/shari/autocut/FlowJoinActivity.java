@@ -509,9 +509,10 @@ public final class FlowJoinActivity extends Activity {
  private void cancelRender(){
   if(!busy||transformer==null)return;
   Transformer old=transformer;
+  File incomplete=activeExport;
   finishBusy();
   try{old.cancel();}catch(Exception ignored){}
-  if(activeExport!=null)activeExport.delete();
+  if(incomplete!=null)incomplete.delete();
   status.setText("Render cancelled. Original clips and project are unchanged.");
   progress.setProgress(0);
  }
