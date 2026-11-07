@@ -4,6 +4,17 @@
 
 Native Android app: media files from device storage, video preview, editable time-coded captions, offline speech recognition with a user-installed Vosk model, rule-based motion style planning, animated burned-in captions, optional imported PNG sticker, trim/crop, Media3 Transformer encoding, audio-only narration to captioned video, MP4 saved into Movies/CineZehn.
 
+## v0.5.0 modern studio + new offline tools
+- New modern Android **Home Dashboard**, 5-screen navigation (Home, Studios, Offline Director, Creative Library, Settings), persistent dark/light dashboard preference, offline-readiness status and context-aware editing briefs.
+- Existing **Flow/Veo scene editor** redesigned with a card layout, media clip thumbnails, reusable editing styles and functional clip trimming, scene-specific timed captions, Vosk offline transcription, SRT exports, presets, crop/fit shape choices, 15-second test render, optional animated ending, project restore and MP4 Gallery export.
+- Original **procedural 2D explainer host**, driven by dialogue text keywords to gesture and animate; **not** realistic neural avatar, gesture IK, or genuine viseme lip-sync.
+- Original procedural **comic reaction overlays** when scene narration includes comedy/surprise words. These are not imported movie memes.
+- New native **Silence Cutter Studio**: Android MediaExtractor/MediaCodec PCM decode, energy-based audio activity segmentation, adjustable sensitivity, optional word padding, non-destructive cuts and MP4/M4A export. Energy is **not** trained speech VAD. Music/noise may cause errors. Test before publishing.
+- Single-video and narration studio restyled with white rounded cards, modern typography and controls.
+- Offline Director and library offer real keyword/rule-based editing plans and style selection; **no GPT-style LLM, image/video generation or research engine is installed.**
+- Android namespace stays \`com.shari.autocut\` (existing Java packages); independent installation ID is \`com.cinezehn.aistudio\`. Install over v0.4.1+; older \`com.shari.autocut.offline\` is a distinct app.
+- Caution: GitHub CI compilation is not device acceptance testing. Mixed codecs/HDR, silence cuts, avatar overlays and long videos must still be tested on supported Android hardware.
+
 ## v0.4.2 speech model download recovery
 - Automatic retry from the public Hugging Face LocalStack model mirror when the official Vosk model host fails DNS/connection.
 - Known SHA-256 checks maintained for English and Indian English model ZIPs; archives validated and safety-limited during import.
