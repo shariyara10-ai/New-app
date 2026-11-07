@@ -1,18 +1,22 @@
-plugins {
-    id 'com.android.application'
-}
+plugins { id 'com.android.application' }
 android {
-    namespace 'com.shari.autocut'
-    compileSdk 35
-    defaultConfig {
-        applicationId 'com.shari.autocut'
-        minSdk 29
-        targetSdk 35
-        versionCode 1
-        versionName '0.1.0'
-    }
-    compileOptions {
-        sourceCompatibility JavaVersion.VERSION_17
-        targetCompatibility JavaVersion.VERSION_17
-    }
+ namespace 'com.shari.autocut'
+ compileSdk 35
+ defaultConfig {
+  applicationId 'com.shari.autocut.offline'
+  minSdk 29
+  targetSdk 35
+  versionCode 2
+  versionName '0.2.0-offline'
+ }
+ compileOptions {
+  sourceCompatibility JavaVersion.VERSION_17
+  targetCompatibility JavaVersion.VERSION_17
+ }
+}
+dependencies {
+ implementation 'androidx.media3:media3-common:1.11.1'
+ implementation 'androidx.media3:media3-effect:1.11.1'
+ implementation 'androidx.media3:media3-transformer:1.11.1'
+ implementation 'com.alphacephei:vosk-android:0.3.75'
 }

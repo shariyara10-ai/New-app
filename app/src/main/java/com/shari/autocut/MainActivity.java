@@ -1,296 +1,341 @@
 package com.shari.autocut;
 
 import android.app.Activity;
-import android.app.DownloadManager;
 import android.app.AlertDialog;
+import android.content.ContentValues;
+import android.content.Intent;
+import android.database.Cursor;
+import android.graphics.Bitmap;
+import android.graphics.BitmapFactory;
+import android.graphics.Canvas;
+import android.graphics.Color;
+import android.graphics.LinearGradient;
+import android.graphics.Paint;
+import android.graphics.Shader;
+import android.icu.text.Transliterator;
+import android.media.MediaMetadataRetriever;
+import android.net.Uri;
 import android.os.Bundle;
 import android.os.Environment;
-import android.content.Context;
-import android.content.Intent;
-import android.content.SharedPreferences;
-import android.graphics.Color;
-import android.graphics.Typeface;
-import android.graphics.drawable.GradientDrawable;
-import android.net.Uri;
-import android.view.View;
+import android.provider.MediaStore;
+import android.text.InputType;
 import android.view.Gravity;
-import android.webkit.CookieManager;
-import android.webkit.DownloadListener;
-import android.webkit.URLUtil;
-import android.webkit.ValueCallback;
-import android.webkit.WebChromeClient;
-import android.webkit.WebView;
-import android.webkit.WebViewClient;
-import android.webkit.WebResourceRequest;
-import android.webkit.WebResourceError;
-import android.webkit.WebSettings;
-import android.widget.Button;
-import android.widget.EditText;
-import android.widget.FrameLayout;
-import android.widget.LinearLayout;
-import android.widget.ProgressBar;
-import android.widget.ScrollView;
-import android.widget.TextView;
-import android.widget.Toast;
+import android.view.View;
+import android.widget.*;
+import androidx.media3.common.Effect;
+import androidx.media3.common.MediaItem;
+import androidx.media3.common.MimeTypes;
+import androidx.media3.effect.OverlayEffect;
+import androidx.media3.effect.Presentation;
+import androidx.media3.transformer.Composition;
+import androidx.media3.transformer.EditedMediaItem;
+import androidx.media3.transformer.EditedMediaItemSequence;
+import androidx.media3.transformer.Effects;
+import androidx.media3.transformer.ExportException;
+import androidx.media3.transformer.ExportResult;
+import androidx.media3.transformer.Transformer;
 
+import java.io.File;
+import java.io.FileOutputStream;
+import java.io.InputStream;
+import java.io.OutputStream;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.List;
+import java.util.Locale;
+import java.util.Collections;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+
+@androidx.media3.common.util.UnstableApi
 public class MainActivity extends Activity {
-    private static final int CHOOSE_FILE_REQUEST = 4219;
-    private static final String PREFS = "autocut_client";
-    private static final int BACKGROUND = Color.rgb(10, 16, 28);
-    private static final int CARD = Color.rgb(19, 28, 43);
-    private static final int ACCENT = Color.rgb(69, 188, 244);
-    private FrameLayout root;
-    private LinearLayout home;
-    private LinearLayout editorContainer;
-    private EditText address;
-    private TextView status;
-    private WebView webView;
-    private ProgressBar progress;
-    private ValueCallback<Uri[]> uploadCallback;
-    private String endpoint = "";
+ private static final int PICK_MEDIA=15,PICK_MODEL=16,PICK_PNG=17;
+ private final int bg=Color.rgb(9,15,29),card=Color.rgb(22,31,48),aqua=Color.rgb(42,167,226);
+ private final ExecutorService jobs=Executors.newSingleThreadExecutor();
+ private Uri source;
+ private boolean isAudioOnly=false;
+ private long durationMs=30000L;
+ private Bitmap selectedPng=null;
+ private ArrayList<CaptionSegment> scenes=new ArrayList<>();
+ private VideoView preview;
+ private TextView status,mediaInfo,modelStatus;
+ private ProgressBar progress;
+ private EditText transcript,startField,endField;
+ private Spinner preset,format;
+ private Button transcribeButton,exportButton,autoButton;
+ private Uri savedVideo=null;
+ private Transformer transformer=null;
+ private boolean busy=false;
+ private LinearLayout root;
+ private int d(float n){return Math.round(n*getResources().getDisplayMetrics().density);}
+ @Override public void onCreate(Bundle b){super.onCreate(b);getWindow().setStatusBarColor(bg);getWindow().setNavigationBarColor(bg);showEditor();}
+ private TextView label(String msg,int size,int color,boolean bold) {
+  TextView v=new TextView(this);v.setText(msg);v.setTextColor(color);v.setTextSize(size);
+  if(bold)v.setTypeface(null,android.graphics.Typeface.BOLD);return v;
+ }
+ private Button btn(String text){Button b=new Button(this);b.setText(text);b.setAllCaps(false);b.setTextSize(13);b.setTextColor(Color.WHITE);b.setBackgroundTintList(android.content.res.ColorStateList.valueOf(aqua));return b;}
+ private void add(LinearLayout target,View v,int top){LinearLayout.LayoutParams p=new LinearLayout.LayoutParams(-1,-2);p.topMargin=d(top);target.addView(v,p);}
+ private LinearLayout panel(){
+  LinearLayout p=new LinearLayout(this);p.setPadding(d(14),d(14),d(14),d(17));p.setOrientation(LinearLayout.VERTICAL);p.setBackgroundColor(card);add(root,p,15);return p;
+ }
+ private void showEditor(){
+  ScrollView scroll=new ScrollView(this);scroll.setFillViewport(true);scroll.setBackgroundColor(bg);
+  root=new LinearLayout(this);root.setOrientation(LinearLayout.VERTICAL);root.setPadding(d(16),d(25),d(16),d(30));scroll.addView(root);
+  setContentView(scroll);
+  add(root,label("SHARI / AUTOCUT OFFLINE",13,aqua,true),0);
+  add(root,label("AI-assisted Video Editor",26,Color.WHITE,true),7);
+  add(root,label("100% phone-based media editing. No desktop server, account or API key required. Offline Vosk model imported separately.",13,Color.rgb(177,191,210),false),9);
+  LinearLayout media=panel();
+  add(media,label("1  Import video or narration",17,Color.WHITE,true),0);
+  Button pick=btn("Choose Video / Audio");add(media,pick,12);pick.setOnClickListener(v->choose("video/*\n audio/*",PICK_MEDIA));
+  mediaInfo=label("No media selected",13,Color.rgb(197,206,223),false);add(media,mediaInfo,9);
+  preview=new VideoView(this);preview.setBackgroundColor(Color.BLACK);
+  LinearLayout.LayoutParams vp=new LinearLayout.LayoutParams(-1,d(205));vp.topMargin=d(12);media.addView(preview,vp);
+  MediaController mc=new MediaController(this);mc.setAnchorView(preview);preview.setMediaController(mc);
+  LinearLayout trimRow=new LinearLayout(this);trimRow.setOrientation(LinearLayout.HORIZONTAL);
+  startField=smallField("Start sec", "0");endField=smallField("End sec","30");
+  trimRow.addView(startField,new LinearLayout.LayoutParams(0,d(52),1f));
+  LinearLayout.LayoutParams gap=new LinearLayout.LayoutParams(d(10),1);trimRow.addView(new View(this),gap);
+  trimRow.addView(endField,new LinearLayout.LayoutParams(0,d(52),1f));
+  add(media,label("Trim range (seconds)",12,Color.rgb(174,191,207),true),12);add(media,trimRow,6);
 
-    @Override
-    protected void onCreate(Bundle state) {
-        super.onCreate(state);
-        getWindow().setStatusBarColor(BACKGROUND);
-        getWindow().setNavigationBarColor(BACKGROUND);
-        root = new FrameLayout(this);
-        root.setBackgroundColor(BACKGROUND);
-        setContentView(root);
-        showHome();
-    }
+  LinearLayout model=panel();
+  add(model,label("2  Optional offline speech-to-text",17,Color.WHITE,true),0);
+  modelStatus=label("No speech model installed. Import a Vosk ZIP once; transcription can then run without internet.",13,Color.rgb(176,194,213),false);
+  add(model,modelStatus,7);
+  Button getModels=btn("Open official Vosk models page");add(model,getModels,8);
+  getModels.setOnClickListener(v->{Intent i=new Intent(Intent.ACTION_VIEW,Uri.parse("https://alphacephei.com/vosk/models"));startActivity(i);});
+  Button importModel=btn("Import downloaded Vosk model ZIP");add(model,importModel,7);importModel.setOnClickListener(v->choose("application/zip",PICK_MODEL));
+  transcribeButton=btn("Transcribe selected audio OFFLINE");add(model,transcribeButton,9);transcribeButton.setOnClickListener(v->transcribe());
+  add(model,label("Use small English or Hindi Vosk models. Urdu has no matching small-model guarantee. Hinglish code-switching and Roman spelling may be inaccurate; always correct captions.",12,Color.rgb(164,178,196),false),11);
 
-    private int dp(int value) {
-        return Math.round(value * getResources().getDisplayMetrics().density);
-    }
+  LinearLayout edit=panel();
+  add(edit,label("3  Transcript & caption timeline",17,Color.WHITE,true),0);
+  transcript=new EditText(this);transcript.setTextColor(Color.WHITE);transcript.setHintTextColor(Color.GRAY);transcript.setTextSize(14);
+  transcript.setHint("[00:00.00-00:02.20] Your first sentence\n[00:02.20-00:04.70] Your second sentence\n\nOr paste plain text.");
+  transcript.setMinLines(6);transcript.setGravity(Gravity.TOP|Gravity.START);transcript.setInputType(InputType.TYPE_CLASS_TEXT|InputType.TYPE_TEXT_FLAG_MULTI_LINE|InputType.TYPE_TEXT_FLAG_CAP_SENTENCES);
+  transcript.setBackgroundColor(Color.rgb(32,43,62));transcript.setPadding(d(12),d(12),d(12),d(12));add(edit,transcript,10);
+  Button romanize=btn("Approx. Romanize Urdu/Hindi → Latin");add(edit,romanize,9);romanize.setOnClickListener(v->romanizeText());
+  add(edit,label("Auto planner style",12,Color.rgb(176,194,213),true),11);
+  preset=new Spinner(this);preset.setAdapter(new ArrayAdapter<String>(this,android.R.layout.simple_spinner_dropdown_item,new String[]{"Documentary","Shorts","Explainer"}));add(edit,preset,6);
+  autoButton=btn("Plan caption motion from transcript");add(edit,autoButton,8);autoButton.setOnClickListener(v->plan());
+  Button prompt=btn("Generate visual/PNG asset prompts");add(edit,prompt,8);prompt.setOnClickListener(v->showPrompts());
+  Button png=btn("Add one optional PNG overlay image");add(edit,png,8);png.setOnClickListener(v->choose("image/png",PICK_PNG));
 
-    private GradientDrawable bg(int color, int radius) {
-        GradientDrawable d = new GradientDrawable();
-        d.setColor(color);
-        d.setCornerRadius(dp(radius));
-        return d;
-    }
-
-    private TextView text(String str, int size, int color, boolean bold) {
-        TextView t = new TextView(this);
-        t.setText(str);
-        t.setTextColor(color);
-        t.setTextSize(size);
-        if (bold) t.setTypeface(Typeface.DEFAULT, Typeface.BOLD);
-        return t;
-    }
-
-    private Button button(String title, int color) {
-        Button b = new Button(this);
-        b.setText(title);
-        b.setTextColor(Color.WHITE);
-        b.setTextSize(15);
-        b.setBackground(bg(color, 14));
-        return b;
-    }
-
-    private void showHome() {
-        if (webView != null) webView.setVisibility(View.GONE);
-        root.removeAllViews();
-        ScrollView scroll = new ScrollView(this);
-        scroll.setFillViewport(true);
-        LinearLayout content = new LinearLayout(this);
-        content.setOrientation(LinearLayout.VERTICAL);
-        content.setPadding(dp(22), dp(38), dp(22), dp(24));
-        scroll.addView(content);
-        root.addView(scroll);
-        home = content;
-
-        TextView tag = text("SHARI CREATOR SUITE  /  ANDROID CLIENT", 11, ACCENT, true);
-        content.addView(tag);
-        TextView heading = text("AutoCut AI Studio", 29, Color.WHITE, true);
-        LinearLayout.LayoutParams h = new LinearLayout.LayoutParams(-1, -2);
-        h.topMargin = dp(18);
-        content.addView(heading, h);
-        TextView summary = text("Edit your YouTube videos using speech-aware captions, motion graphics and an AI-assisted timeline.", 16, Color.rgb(180,195,212), false);
-        LinearLayout.LayoutParams s = new LinearLayout.LayoutParams(-1, -2);
-        s.topMargin = dp(8);
-        content.addView(summary, s);
-
-        LinearLayout card = new LinearLayout(this);
-        card.setOrientation(LinearLayout.VERTICAL);
-        card.setPadding(dp(20), dp(22), dp(20), dp(22));
-        card.setBackground(bg(CARD, 20));
-        LinearLayout.LayoutParams c = new LinearLayout.LayoutParams(-1, -2);
-        c.topMargin = dp(26);
-        content.addView(card, c);
-        card.addView(text("CONNECT YOUR EDITOR", 14, Color.WHITE, true));
-        TextView explain = text("Your Windows/Mac/Linux computer runs the editor engine. Your phone must be on the same trusted Wi-Fi.", 14, Color.rgb(183,196,213), false);
-        LinearLayout.LayoutParams e = new LinearLayout.LayoutParams(-1, -2);
-        e.topMargin = dp(8);
-        card.addView(explain, e);
-
-        address = new EditText(this);
-        address.setSingleLine(true);
-        address.setSelectAllOnFocus(true);
-        address.setTextSize(15);
-        address.setTextColor(Color.WHITE);
-        address.setHintTextColor(Color.rgb(128,148,166));
-        address.setHint("http://192.168.1.5:8000");
-        address.setPadding(dp(13), 0, dp(13), 0);
-        address.setBackground(bg(Color.rgb(33, 45, 64), 10));
-        address.setInputType(android.text.InputType.TYPE_CLASS_TEXT | android.text.InputType.TYPE_TEXT_VARIATION_URI);
-        address.setText(getSharedPreferences(PREFS, MODE_PRIVATE).getString("endpoint", ""));
-        LinearLayout.LayoutParams a = new LinearLayout.LayoutParams(-1, dp(55));
-        a.topMargin = dp(16);
-        card.addView(address, a);
-        Button connect = button("Open AI Editor", Color.rgb(31, 130, 189));
-        LinearLayout.LayoutParams b = new LinearLayout.LayoutParams(-1, dp(54));
-        b.topMargin = dp(14);
-        card.addView(connect, b);
-        connect.setOnClickListener(v -> connect());
-
-        status = text("Ready to connect", 13, Color.rgb(160, 182, 205), false);
-        LinearLayout.LayoutParams sp = new LinearLayout.LayoutParams(-1, -2);
-        sp.topMargin = dp(14);
-        card.addView(status, sp);
-
-        TextView steps = text("1. Start the desktop AutoCut AI Studio server.\n2. Run python run.py --host 0.0.0.0\n3. Enter your computer's LAN IP and port 8000 above.\n4. Import video/audio, transcribe, edit and export.", 14, Color.rgb(196, 205, 219), false);
-        steps.setLineSpacing(dp(5), 1f);
-        LinearLayout.LayoutParams stepsLp = new LinearLayout.LayoutParams(-1, -2);
-        stepsLp.topMargin = dp(24);
-        content.addView(steps, stepsLp);
-        TextView limits = text("Requires the desktop engine. This APK does not do on-device Whisper transcription, local Ollama or FFmpeg video rendering.", 12, Color.rgb(150,165,183), false);
-        LinearLayout.LayoutParams l = new LinearLayout.LayoutParams(-1, -2);
-        l.topMargin = dp(21);
-        content.addView(limits, l);
-    }
-
-    private void connect() {
-        String url = address.getText().toString().trim();
-        if (url.isEmpty()) {
-            status.setText("Enter your computer's IP address first.");
-            return;
-        }
-        if (!url.startsWith("http://") && !url.startsWith("https://")) url = "http://" + url;
-        Uri parsed = Uri.parse(url);
-        if (parsed.getHost() == null ||
-            !("http".equals(parsed.getScheme()) || "https".equals(parsed.getScheme()))) {
-            status.setText("Invalid address. Example: http://192.168.1.5:8000");
-            return;
-        }
-        endpoint = url;
-        getSharedPreferences(PREFS, MODE_PRIVATE).edit().putString("endpoint", endpoint).apply();
-        openEditor();
-    }
-
-    private void openEditor() {
-        root.removeAllViews();
-        editorContainer = new LinearLayout(this);
-        editorContainer.setOrientation(LinearLayout.VERTICAL);
-        editorContainer.setBackgroundColor(BACKGROUND);
-        root.addView(editorContainer, new FrameLayout.LayoutParams(-1,-1));
-        LinearLayout bar = new LinearLayout(this);
-        bar.setOrientation(LinearLayout.HORIZONTAL);
-        bar.setGravity(Gravity.CENTER_VERTICAL);
-        bar.setPadding(dp(14), dp(4), dp(12), dp(4));
-        bar.setBackgroundColor(CARD);
-        editorContainer.addView(bar, new LinearLayout.LayoutParams(-1, dp(52)));
-        TextView brand = text("AUTOCUT  AI", 16, Color.WHITE, true);
-        bar.addView(brand, new LinearLayout.LayoutParams(0, -2, 1f));
-        Button settings = button("Server", Color.rgb(49, 63, 84));
-        bar.addView(settings, new LinearLayout.LayoutParams(dp(90), dp(42)));
-        settings.setOnClickListener(v -> showHome());
-
-        progress = new ProgressBar(this, null, android.R.attr.progressBarStyleHorizontal);
-        progress.setMax(100);
-        progress.setProgress(0);
-        editorContainer.addView(progress, new LinearLayout.LayoutParams(-1, dp(3)));
-
-        webView = new WebView(this);
-        editorContainer.addView(webView, new LinearLayout.LayoutParams(-1, 0, 1));
-        WebSettings w = webView.getSettings();
-        w.setJavaScriptEnabled(true);
-        w.setDomStorageEnabled(true);
-        w.setAllowFileAccess(true);
-        w.setMediaPlaybackRequiresUserGesture(false);
-        w.setBuiltInZoomControls(false);
-        w.setDisplayZoomControls(false);
-        w.setUseWideViewPort(true);
-        w.setLoadWithOverviewMode(true);
-        CookieManager.getInstance().setAcceptCookie(true);
-        webView.setWebViewClient(new WebViewClient() {
-            @Override public void onReceivedError(WebView view, WebResourceRequest request, WebResourceError error) {
-                if (request.isForMainFrame()) {
-                    new AlertDialog.Builder(MainActivity.this)
-                        .setTitle("Editor connection failed")
-                        .setMessage("Start the desktop server and check your Wi-Fi/IP address.\n\n" + error.getDescription())
-                        .setPositiveButton("Server settings", (d, w) -> showHome())
-                        .setNegativeButton("Retry", (d, w) -> view.reload())
-                        .show();
-                }
-            }
-        });
-        webView.setWebChromeClient(new WebChromeClient() {
-            @Override public void onProgressChanged(WebView view, int newProgress) {
-                progress.setProgress(newProgress);
-                progress.setVisibility(newProgress >= 100 ? View.GONE : View.VISIBLE);
-            }
-            @Override public boolean onShowFileChooser(WebView view, ValueCallback<Uri[]> callback, FileChooserParams params) {
-                if (uploadCallback != null) uploadCallback.onReceiveValue(null);
-                uploadCallback = callback;
-                try {
-                    Intent chooser = params.createIntent();
-                    startActivityForResult(chooser, CHOOSE_FILE_REQUEST);
-                    return true;
-                } catch (Exception ex) {
-                    uploadCallback = null;
-                    Toast.makeText(MainActivity.this, "Unable to open file picker", Toast.LENGTH_LONG).show();
-                    return false;
-                }
-            }
-        });
-        webView.setDownloadListener((url, agent, disposition, mime, length) -> download(url, agent, disposition, mime));
-        webView.loadUrl(endpoint);
-    }
-
-    private void download(String url, String userAgent, String disposition, String mime) {
-        try {
-            String filename = URLUtil.guessFileName(url, disposition, mime);
-            DownloadManager.Request request = new DownloadManager.Request(Uri.parse(url));
-            request.setTitle(filename);
-            request.setDescription("Shari AutoCut AI Studio export");
-            request.setMimeType(mime);
-            request.addRequestHeader("User-Agent", userAgent);
-            String cookies = CookieManager.getInstance().getCookie(url);
-            if (cookies != null) request.addRequestHeader("Cookie", cookies);
-            request.setNotificationVisibility(DownloadManager.Request.VISIBILITY_VISIBLE_NOTIFY_COMPLETED);
-            request.setDestinationInExternalPublicDir(Environment.DIRECTORY_DOWNLOADS, filename);
-            ((DownloadManager)getSystemService(Context.DOWNLOAD_SERVICE)).enqueue(request);
-            Toast.makeText(this, "Saving to Downloads: " + filename, Toast.LENGTH_LONG).show();
-        } catch (Exception ex) {
-            Toast.makeText(this, "Download failed: " + ex.getMessage(), Toast.LENGTH_LONG).show();
-        }
-    }
-
-    @Override
-    protected void onActivityResult(int request, int result, Intent intent) {
-        super.onActivityResult(request, result, intent);
-        if (request == CHOOSE_FILE_REQUEST && uploadCallback != null) {
-            uploadCallback.onReceiveValue(WebChromeClient.FileChooserParams.parseResult(result, intent));
-            uploadCallback = null;
-        }
-    }
-
-    @Override
-    public void onBackPressed() {
-        if (webView != null && webView.getParent() != null && webView.canGoBack()) {
-            webView.goBack();
-        } else if (webView != null && webView.getParent() != null) {
-            showHome();
-        } else {
-            super.onBackPressed();
-        }
-    }
-
-    @Override
-    protected void onDestroy() {
-        if (webView != null) webView.destroy();
-        super.onDestroy();
-    }
+  LinearLayout out=panel();
+  add(out,label("4  Export video on this phone",17,Color.WHITE,true),0);
+  format=new Spinner(this);format.setAdapter(new ArrayAdapter<String>(this,android.R.layout.simple_spinner_dropdown_item,new String[]{"9:16 Shorts • 720×1280 target","16:9 YouTube • 1280×720 target","1:1 Square"}));add(out,format,10);
+  exportButton=btn("Render and save MP4 to Gallery");add(out,exportButton,10);exportButton.setOnClickListener(v->export());
+  Button share=btn("Share last export");add(out,share,6);share.setOnClickListener(v->shareExport());
+  progress=new ProgressBar(this,null,android.R.attr.progressBarStyleHorizontal);progress.setMax(100);add(out,progress,9);
+  status=label("Ready. Import a media file; paste transcript or add an offline speech model.",13,Color.rgb(191,211,226),false);add(out,status,9);
+  add(root,label("Local processing: Media3 Transformer + Vosk. Rule-based caption styles, not a cloud LLM. This experimental release may fail on unsupported codecs and large videos.",12,Color.rgb(146,161,182),false),22);
+  refreshModel();
+ }
+ private EditText smallField(String hint,String value){
+  EditText e=new EditText(this);e.setSingleLine(true);e.setHint(hint);e.setText(value);
+  e.setTextColor(Color.WHITE);e.setTextSize(14);e.setPadding(d(8),0,d(8),0);
+  e.setInputType(InputType.TYPE_CLASS_NUMBER|InputType.TYPE_NUMBER_FLAG_DECIMAL);
+  e.setBackgroundColor(Color.rgb(35,48,67));return e;
+ }
+ private void choose(String mime,int request) {
+  Intent i=new Intent(Intent.ACTION_OPEN_DOCUMENT);
+  i.addCategory(Intent.CATEGORY_OPENABLE);
+  if(request==PICK_MEDIA){i.setType("*/*");i.putExtra(Intent.EXTRA_MIME_TYPES,new String[]{"video/mp4","video/*","audio/*"});}
+  else {i.setType(mime);}
+  i.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION|Intent.FLAG_GRANT_PERSISTABLE_URI_PERMISSION);
+  startActivityForResult(i,request);
+ }
+ @Override protected void onActivityResult(int req,int result,Intent data){
+  super.onActivityResult(req,result,data);
+  if(result!=RESULT_OK||data==null||data.getData()==null)return;
+  Uri uri=data.getData();
+  if(req==PICK_MEDIA){loadMedia(uri);}
+  if(req==PICK_MODEL){importModel(uri);}
+  if(req==PICK_PNG){loadPng(uri);}
+ }
+ private void loadMedia(Uri uri){
+  if(busy)return;
+  try{
+   source=uri;
+   getContentResolver().takePersistableUriPermission(uri,Intent.FLAG_GRANT_READ_URI_PERMISSION);
+   MediaMetadataRetriever retriever=new MediaMetadataRetriever();
+   retriever.setDataSource(this,uri);
+   String dur=retriever.extractMetadata(MediaMetadataRetriever.METADATA_KEY_DURATION);
+   String video=retriever.extractMetadata(MediaMetadataRetriever.METADATA_KEY_HAS_VIDEO);
+   durationMs=dur==null?30000:Long.parseLong(dur);
+   if(durationMs<=0)durationMs=30000;
+   isAudioOnly=!"yes".equalsIgnoreCase(video);
+   retriever.release();
+   startField.setText("0");
+   endField.setText(String.format(Locale.US,"%.1f",durationMs/1000.0));
+   mediaInfo.setText((isAudioOnly?"AUDIO":"VIDEO")+" selected • "+CaptionSegment.timestamp(durationMs)+" • local file");
+   preview.setVisibility(isAudioOnly?View.GONE:View.VISIBLE);
+   preview.setVideoURI(uri);
+   scenes.clear();transcript.setText("");
+   update("Media selected. You can transcribe or paste text.");progress.setProgress(0);
+  }catch(Exception ex){source=null;error("Could not open media: "+ex.getMessage());}
+ }
+ private void loadPng(Uri u) {
+  try(InputStream in=getContentResolver().openInputStream(u)){
+   BitmapFactory.Options opts=new BitmapFactory.Options();opts.inSampleSize=2;
+   selectedPng=BitmapFactory.decodeStream(in,null,opts);
+   if(selectedPng==null)throw new Exception("Invalid image");
+   update("PNG image selected. Overlay will appear at top-right while captions display.");
+  }catch(Exception e){error("PNG import failed: "+e.getMessage());}
+ }
+ private void importModel(Uri u){
+  if(busy)return;setBusy(true);update("Extracting Vosk model ZIP on phone...");
+  jobs.execute(()->{
+   try{File m=ModelImporter.install(this,u);runOnUiThread(()->{setBusy(false);refreshModel();update("Offline model ready: "+m.getName());});}
+   catch(Exception e){runOnUiThread(()->{setBusy(false);error("Model import failed: "+e.getMessage());});}
+  });
+ }
+ private void refreshModel(){if(modelStatus!=null){File f=ModelImporter.active(this);modelStatus.setText(f==null?"No offline model. Download small English/Hindi ZIP from official page, then import.":"Installed offline model: "+f.getName()+" • transcription ready.");}}
+ private void transcribe(){
+  if(busy)return;
+  if(source==null){error("First select a video or audio file.");return;}
+  File model=ModelImporter.active(this);
+  if(model==null){error("First download and import a Vosk speech model ZIP.");return;}
+  setBusy(true);update("Transcribing locally. Long files may take time; keep app open.");
+  jobs.execute(()->{
+   try{
+    ArrayList<CaptionSegment> found=OfflineTranscriber.transcribe(this,source,model,p->runOnUiThread(()->progress.setProgress(p)));
+    runOnUiThread(()->{
+     scenes=found;transcript.setText(CaptionSegment.format(found));
+     setBusy(false);
+     if(found.isEmpty())error("Transcription finished but no words detected. Try another speech model or paste transcript.");
+     else{update("Offline transcription finished: "+found.size()+" caption segments. Review spelling and timestamps.");progress.setProgress(100);}
+    });
+   }catch(Exception e){runOnUiThread(()->{setBusy(false);error("Transcription failed: "+e.getClass().getSimpleName()+": "+e.getMessage());});}
+  });
+ }
+ private void romanizeText(){
+  try{
+   Transliterator t=Transliterator.getInstance("Any-Latin; Latin-ASCII");
+   transcript.setText(t.transliterate(transcript.getText().toString()));
+   update("Rough Latin transliteration generated. Edit Hinglish pronunciation manually.");
+  }catch(Exception ex){error("Romanization not supported on this device.");}
+ }
+ private String presetValue(){int i=preset.getSelectedItemPosition();return i==0?"documentary":i==1?"shorts":"explainer";}
+ private ArrayList<CaptionSegment> parsed() {
+  long clipDuration=Math.max(1000,durationMs);
+  return CaptionSegment.parse(transcript.getText().toString(),clipDuration);
+ }
+ private void plan(){
+  ArrayList<CaptionSegment> parsed=parsed();
+  if(parsed.isEmpty()){error("Enter transcript with timestamp lines, or paste plain text.");return;}
+  scenes=parsed;AutoPlanner.apply(scenes,presetValue());
+  update("Motion plan created for "+scenes.size()+" captions. Rule-based keyword classification, not generative AI.");
+ }
+ private void showPrompts(){
+  plan();if(scenes.isEmpty())return;
+  final String text=AutoPlanner.assetPrompts(scenes,presetValue());
+  ScrollView sv=new ScrollView(this);
+  TextView t=label(text,13,Color.DKGRAY,false);t.setPadding(d(20),d(10),d(20),d(10));sv.addView(t);
+  new AlertDialog.Builder(this).setTitle("Scene PNG & motion prompts").setView(sv)
+   .setPositiveButton("Copy all",(dialog,which)->{
+    android.content.ClipboardManager cm=(android.content.ClipboardManager)getSystemService(CLIPBOARD_SERVICE);
+    cm.setPrimaryClip(android.content.ClipData.newPlainText("AutoCut prompts",text));update("Prompts copied to clipboard.");
+   }).setNegativeButton("Close",null).show();
+ }
+ private long[] trimTimes(){
+  try{
+   long start=Math.round(Double.parseDouble(startField.getText().toString())*1000);
+   long end=Math.round(Double.parseDouble(endField.getText().toString())*1000);
+   if(start<0||end<=start||end>durationMs+500)throw new Exception("Out-of-range trim");
+   return new long[]{start,Math.min(end,durationMs)};
+  }catch(Exception e){return null;}
+ }
+ private File backgroundForAudio(long lenMs) throws Exception {
+  int w=720,h=1280;
+  Bitmap b=Bitmap.createBitmap(w,h,Bitmap.Config.ARGB_8888);
+  Canvas c=new Canvas(b);Paint p=new Paint(3);
+  p.setShader(new LinearGradient(0,0,w,h,new int[]{Color.rgb(8,15,37),Color.rgb(27,48,83),Color.rgb(5,11,30)},null,Shader.TileMode.CLAMP));
+  c.drawRect(0,0,w,h,p);p.setShader(null);
+  p.setTextSize(36f);p.setColor(Color.rgb(210,216,224));p.setTypeface(android.graphics.Typeface.DEFAULT_BOLD);p.setTextAlign(Paint.Align.CENTER);
+  c.drawText("SHARI  •  AUDIO STORY",w/2f,140f,p);
+  p.setTextSize(23f);p.setColor(Color.rgb(121,192,226));c.drawText("AUTO-CUT OFFLINE",w/2f,1220f,p);
+  File f=new File(getCacheDir(),"autocut_story_background.png");
+  try(FileOutputStream out=new FileOutputStream(f)){b.compress(Bitmap.CompressFormat.PNG,95,out);}
+  b.recycle();return f;
+ }
+ private void export(){
+  if(busy)return;
+  if(source==null){error("Import video or audio first.");return;}
+  long[] trim=trimTimes();
+  if(trim==null){error("Invalid start/end. End must be after start and within media duration.");return;}
+  ArrayList<CaptionSegment> parsed=parsed();
+  if(parsed.isEmpty()){error("Enter a transcript for motion captions, or use transcription.");return;}
+  AutoPlanner.apply(parsed,presetValue());scenes=parsed;
+  setBusy(true);progress.setProgress(8);update("Preparing offline video render...");
+  final long start=trim[0],end=trim[1];
+  File out=new File(getCacheDir(),"autocut_export_"+System.currentTimeMillis()+".mp4");
+  try {
+   final List<Effect> videoFx=new ArrayList<>();
+   int f=format.getSelectedItemPosition();
+   float ratio=f==0?9f/16f:f==1?16f/9f:1f;
+   int height=f==0?1280:f==1?720:720;
+   videoFx.add(Presentation.createForAspectRatio(ratio,Presentation.LAYOUT_SCALE_TO_FIT_WITH_CROP));
+   videoFx.add(Presentation.createForHeight(height));
+   videoFx.add(new OverlayEffect(Collections.singletonList(new CaptionOverlay(parsed,presetValue(),selectedPng,start))));
+   Effects fx=new Effects(Collections.emptyList(),videoFx);
+   transformer=new Transformer.Builder(this)
+    .setVideoMimeType(MimeTypes.VIDEO_H264)
+    .setAudioMimeType(MimeTypes.AUDIO_AAC)
+    .addListener(new Transformer.Listener() {
+     @Override public void onCompleted(Composition composition,ExportResult result) {
+      update("Encoding complete. Saving MP4 to phone Gallery...");progress.setProgress(92);
+      jobs.execute(()->{
+       try{Uri saved=saveVideo(out);runOnUiThread(()->{savedVideo=saved;setBusy(false);progress.setProgress(100);update("Export saved successfully to Movies/ShariAutoCut. Open Gallery or tap Share.");});}
+       catch(Exception ex){runOnUiThread(()->{setBusy(false);error("Video encoded but Gallery saving failed: "+ex.getMessage());});}
+       finally{out.delete();}
+      });
+     }
+     @Override public void onError(Composition composition,ExportResult result,ExportException ex) {
+      setBusy(false);out.delete();error("Video export failed: "+ex.getMessage());
+     }
+    }).build();
+   MediaItem.ClippingConfiguration clipping=new MediaItem.ClippingConfiguration.Builder().setStartPositionMs(start).setEndPositionMs(end).build();
+   if(!isAudioOnly) {
+    MediaItem item=new MediaItem.Builder().setUri(source).setClippingConfiguration(clipping).build();
+    transformer.start(new EditedMediaItem.Builder(item).setEffects(fx).build(),out.getAbsolutePath());
+   }else{
+    File background=backgroundForAudio(end-start);
+    MediaItem image=new MediaItem.Builder().setUri(Uri.fromFile(background)).setImageDurationMs(end-start).build();
+    EditedMediaItem video=new EditedMediaItem.Builder(image).setFrameRate(24).setEffects(fx).build();
+    MediaItem audio=new MediaItem.Builder().setUri(source).setClippingConfiguration(clipping).build();
+    EditedMediaItem sound=new EditedMediaItem.Builder(audio).build();
+    Composition composition=new Composition.Builder(Arrays.asList(
+     EditedMediaItemSequence.withVideoFrom(Collections.singletonList(video)),
+     EditedMediaItemSequence.withAudioFrom(Collections.singletonList(sound))
+    )).build();
+    transformer.start(composition,out.getAbsolutePath());
+   }
+   progress.setProgress(20);update("Rendering MP4 locally; keep app open. Very large files may take longer.");
+  }catch(Exception e){setBusy(false);out.delete();error("Render cannot start: "+e.getClass().getSimpleName()+": "+e.getMessage());}
+ }
+ private Uri saveVideo(File src) throws Exception{
+  String name="ShariAutoCut_"+System.currentTimeMillis()+".mp4";
+  ContentValues cv=new ContentValues();cv.put(MediaStore.Video.Media.DISPLAY_NAME,name);cv.put(MediaStore.Video.Media.MIME_TYPE,"video/mp4");
+  cv.put(MediaStore.Video.Media.RELATIVE_PATH,Environment.DIRECTORY_MOVIES+"/ShariAutoCut");
+  cv.put(MediaStore.Video.Media.IS_PENDING,1);
+  Uri u=getContentResolver().insert(MediaStore.Video.Media.EXTERNAL_CONTENT_URI,cv);
+  if(u==null)throw new IllegalStateException("Cannot create video in MediaStore");
+  try(InputStream in=new java.io.FileInputStream(src);OutputStream output=getContentResolver().openOutputStream(u)){
+   if(output==null)throw new IllegalStateException("Cannot write output video");
+   byte[] data=new byte[128*1024];int n;while((n=in.read(data))!=-1)output.write(data,0,n);
+  }catch(Exception e){getContentResolver().delete(u,null,null);throw e;}
+  cv.clear();cv.put(MediaStore.Video.Media.IS_PENDING,0);getContentResolver().update(u,cv,null,null);
+  return u;
+ }
+ private void shareExport(){
+  if(savedVideo==null){error("Export a video before sharing.");return;}
+  Intent i=new Intent(Intent.ACTION_SEND);i.setType("video/mp4");i.putExtra(Intent.EXTRA_STREAM,savedVideo);
+  i.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION);startActivity(Intent.createChooser(i,"Share edited MP4"));
+ }
+ private void setBusy(boolean yes){busy=yes;if(transcribeButton!=null)transcribeButton.setEnabled(!yes);if(exportButton!=null)exportButton.setEnabled(!yes);if(autoButton!=null)autoButton.setEnabled(!yes);}
+ private void update(String message){if(status!=null)status.setText(message);}
+ private void error(String message){update(message);Toast.makeText(this,message,Toast.LENGTH_LONG).show();}
+ @Override protected void onDestroy(){if(preview!=null)preview.stopPlayback();jobs.shutdown();super.onDestroy();}
 }
