@@ -16,6 +16,7 @@ import androidx.media3.transformer.*;
 import java.io.*;
 import java.util.*;
 import java.util.concurrent.*;
+import org.json.*;
 
 @androidx.media3.common.util.UnstableApi
 public final class FlowJoinActivity extends Activity {
@@ -26,8 +27,11 @@ public final class FlowJoinActivity extends Activity {
  private LinearLayout root, list;
  private TextView summary,status;
  private EditText endText;
- private CheckBox addEnd;
- private Spinner endLength;
+ private CheckBox addEnd,addCaptions,addGraphics,cropToFill;
+ private Spinner endLength,styleSpinner,formatSpinner;
+ private EditText directorPrompt;
+ private Button cancelButton,diagnosticButton;
+ private File activeExport;
  private ProgressBar progress;
  private VideoView preview;
  private Button joinButton;
@@ -57,18 +61,41 @@ public final class FlowJoinActivity extends Activity {
   sc.addView(root);sc.setOnApplyWindowInsetsListener((v,i)->{sc.setPadding(0,i.getSystemWindowInsetTop(),0,i.getSystemWindowInsetBottom());return i;});
   setContentView(sc);
   add(root,title("CINEZEHN / AI STUDIO",12,false));add(root,title("Flow Scene Joiner",27,true));
-  add(root,title("Sequence your Flow/Veo clips with original built-in voiceovers. No meme insertions or extra scene effects. Optional animated outro.",13,false));
+  add(root,title("Offline multi-clip editor: sequence, trim, caption and style your Flow/Veo videos. Review before publishing. No cloud AI model is bundled.",13,false));
   LinearLayout input=panel("1  Select videos");
   Button pick=button("Select multiple Flow clips");add(input,pick);pick.setOnClickListener(v->select());
   summary=title("No clips selected",13,false);add(input,summary);
   list=new LinearLayout(this);list.setOrientation(LinearLayout.VERTICAL);add(input,list);
   Button clear=button("Clear all clips");add(input,clear);clear.setOnClickListener(v->{if(!busy){scenes.clear();refresh();}});
+  Button saveProjectButton=button("Save project on phone");add(input,saveProjectButton);
+  saveProjectButton.setOnClickListener(v->{persistProject();Toast.makeText(this,"Project saved locally",Toast.LENGTH_SHORT).show();});
   LinearLayout pv=panel("2  Preview individual clip");
   preview=new VideoView(this);preview.setBackgroundColor(Color.BLACK);
   pv.addView(preview,new LinearLayout.LayoutParams(-1,dp(190)));
   MediaController controls=new MediaController(this);controls.setAnchorView(preview);preview.setMediaController(controls);
-  LinearLayout ending=panel("3  Thanks for watching outro");
-  addEnd=new CheckBox(this);addEnd.setText("Append animated ending");addEnd.setTextColor(Color.BLACK);addEnd.setChecked(true);add(ending,addEnd);
+  LinearLayout creative=panel("3  Offline Creative Director");
+  add(creative,title("AI-assisted planning uses built-in rules. It is not a ChatGPT-style language model.",12,false));
+  styleSpinner=new Spinner(this);
+  ArrayAdapter<String> styleAdapter=new ArrayAdapter<>(this,android.R.layout.simple_spinner_item,CreativeDirector.STYLES);
+  styleAdapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item);
+  styleSpinner.setAdapter(styleAdapter);add(creative,styleSpinner);
+  directorPrompt=new EditText(this);directorPrompt.setMinLines(2);directorPrompt.setMaxLines(4);
+  directorPrompt.setHint("Describe editing style: e.g. dramatic historical story with cinematic captions");add(creative,directorPrompt);
+  Button plan=button("Generate offline editing plan");add(creative,plan);plan.setOnClickListener(v->planOffline());
+  addGraphics=new CheckBox(this);addGraphics.setText("Animated progress, scene numbers and contextual graphics");addGraphics.setChecked(true);add(creative,addGraphics);
+  addCaptions=new CheckBox(this);addCaptions.setText("Burn-in edited / transcribed captions");addCaptions.setChecked(true);add(creative,addCaptions);
+  Button exportSrt=button("Export subtitle SRT to Downloads");add(creative,exportSrt);exportSrt.setOnClickListener(v->exportSrt());
+  LinearLayout outputLayout=panel("4  Video shape and export quality");
+  formatSpinner=new Spinner(this);
+  ArrayAdapter<String> formats=new ArrayAdapter<>(this,android.R.layout.simple_spinner_item,
+   new String[]{"9:16 Shorts / Reels 720x1280","16:9 Landscape 1280x720","1:1 Square 720x720","Keep source dimensions"});
+  formats.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item);
+  formatSpinner.setAdapter(formats);add(outputLayout,formatSpinner);
+  cropToFill=new CheckBox(this);cropToFill.setText("Fill frame by cropping (off = safe letterbox)");cropToFill.setChecked(false);add(outputLayout,cropToFill);
+  Button analyzeAll=button("Check scene metadata and compatibility");add(outputLayout,analyzeAll);
+  analyzeAll.setOnClickListener(v->analyzeAll());
+  LinearLayout ending=panel("5  Optional animated ending");
+  addEnd=new CheckBox(this);addEnd.setText("Append animated ending");addEnd.setTextColor(Color.BLACK);addEnd.setChecked(false);add(ending,addEnd);
   endText=new EditText(this);endText.setSingleLine(true);endText.setText("THANKS FOR WATCHING!");
   endText.setTextColor(Color.BLACK);add(ending,endText);
   endLength=new Spinner(this);
@@ -76,12 +103,15 @@ public final class FlowJoinActivity extends Activity {
   adapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item);
   endLength.setAdapter(adapter);endLength.setSelection(1);add(ending,endLength);
   add(ending,title("Like • Comment • Subscribe. Outro contains no music or memes.",12,false));
-  LinearLayout output=panel("4  Export");
-  joinButton=button("JOIN CLIPS & EXPORT MP4");add(output,joinButton);joinButton.setOnClickListener(v->render());
+  LinearLayout output=panel("6  Render and share");
+  joinButton=button("RENDER FULL VIDEO TO MP4");add(output,joinButton);joinButton.setOnClickListener(v->render(false));
+  diagnosticButton=button("TEST EXPORT — FIRST 15 SECONDS");add(output,diagnosticButton);diagnosticButton.setOnClickListener(v->render(true));
+  cancelButton=button("Cancel active video render");add(output,cancelButton);cancelButton.setEnabled(false);cancelButton.setOnClickListener(v->cancelRender());
   Button share=button("Share last video");add(output,share);share.setOnClickListener(v->share());
   progress=new ProgressBar(this,null,android.R.attr.progressBarStyleHorizontal);progress.setMax(100);add(output,progress);
   status=title("Ready — add your clips.",13,false);add(output,status);
-  add(root,title("All processing on this phone, no account or API. Scene joining uses clean cuts. Mixed codecs/HDR may require compatible source files.",12,false));
+  add(root,title("All processing on-device. Vosk transcription requires a separately installed model. Complex effects and mixed codecs/HDR may fail on some phones; the 15-second test helps diagnose.",12,false));
+  restoreProject();
  }
  private void select(){
   if(busy)return;
@@ -127,20 +157,251 @@ public final class FlowJoinActivity extends Activity {
  private void refresh(){
   list.removeAllViews();long total=0;int aud=0;
   for(int j=0;j<scenes.size();j++){
-   final int idx=j;FlowScene s=scenes.get(j);total+=s.durationMs;if(s.hasAudio)aud++;
+   final int idx=j;FlowScene s=scenes.get(j);total+=s.editingDurationMs();if(s.hasAudio)aud++;
    LinearLayout l=new LinearLayout(this);l.setOrientation(LinearLayout.VERTICAL);l.setPadding(dp(4),dp(8),dp(4),dp(8));add(list,l);
-   add(l,title((j+1)+". "+s.fileName+" • "+String.format(Locale.US,"%.1fs",s.durationMs/1000f)+(s.hasAudio?" • Voice/audio":" • Silent"),12,true));
+   add(l,title((j+1)+". "+s.fileName+" • "+String.format(Locale.US,"%.1fs",s.editingDurationMs()/1000f)+(s.hasAudio?" • Voice/audio":" • Silent"),12,true));
    LinearLayout actions=new LinearLayout(this);actions.setOrientation(LinearLayout.HORIZONTAL);add(l,actions);
    Button play=button("Preview"),up=button("↑"),down=button("↓"),remove=button("✕");
    for(Button b:new Button[]{play,up,down,remove})actions.addView(b,new LinearLayout.LayoutParams(0,dp(43),1));
-   play.setOnClickListener(v->{preview.setVideoURI(s.uri);preview.start();});
+   play.setOnClickListener(v->{preview.setVideoURI(s.uri);preview.setOnPreparedListener(mp->{preview.seekTo((int)s.trimStartMs);preview.start();});});
    up.setEnabled(j>0);down.setEnabled(j<scenes.size()-1);
    up.setOnClickListener(v->{if(!busy){Collections.swap(scenes,idx,idx-1);refresh();}});
    down.setOnClickListener(v->{if(!busy){Collections.swap(scenes,idx,idx+1);refresh();}});
    remove.setOnClickListener(v->{if(!busy){scenes.remove(idx);refresh();}});
+   LinearLayout advanced=new LinearLayout(this);advanced.setOrientation(LinearLayout.HORIZONTAL);add(l,advanced);
+   Button captions=button("Captions"),transcribe=button("Transcribe"),trim=button("Trim"),inspect=button("Inspect");
+   for(Button b:new Button[]{captions,transcribe,trim,inspect}){b.setAllCaps(false);b.setTextSize(10);advanced.addView(b,new LinearLayout.LayoutParams(0,dp(48),1));}
+   captions.setOnClickListener(v->editCaptions(s));
+   transcribe.setOnClickListener(v->transcribeScene(s));
+   trim.setOnClickListener(v->trimScene(s));
+   inspect.setOnClickListener(v->inspectScene(s));
   }
-  summary.setText(scenes.size()+" scenes • "+String.format(Locale.US,"%.1f",total/1000f)+" sec • "+aud+" with audio. Use arrows to reorder.");
+  summary.setText(scenes.size()+" scenes • "+String.format(Locale.US,"%.1f",total/1000f)+" sec • "+aud+" with audio. Rearrange using arrows.");
+  persistProject();
  }
+
+ private void editCaptions(FlowScene scene){
+  if(busy)return;
+  EditText edit=new EditText(this);edit.setMinLines(4);edit.setMaxLines(12);
+  edit.setText(scene.caption);edit.setTextSize(14);
+  edit.setHint("Type dialogue or timed lines: [00:00.00-00:02.00] narration");
+  new AlertDialog.Builder(this).setTitle("Captions — "+scene.fileName)
+   .setMessage("Manual text is divided into caption beats. Timecodes are relative to the original clip.")
+   .setView(edit).setPositiveButton("Save captions",(d,w)->{
+    scene.caption=edit.getText().toString().trim();scene.subtitles.clear();
+    if(!scene.caption.isEmpty())scene.subtitles.addAll(CaptionSegment.parse(scene.caption,scene.durationMs));
+    refresh();status.setText("Captions saved. Export with Burn-in captions enabled.");
+   }).setNegativeButton("Cancel",null).show();
+ }
+ private void transcribeScene(FlowScene scene){
+  if(busy)return;
+  File model=ModelImporter.active(this);
+  if(model==null){new AlertDialog.Builder(this).setTitle("Offline speech model needed")
+    .setMessage("Import or download a Vosk model from the main editor first. English/Hindi models do not guarantee accurate Urdu or Hinglish.")
+    .setPositiveButton("OK",null).show();return;}
+  if(!scene.hasAudio){status.setText("This clip has no audio track.");return;}
+  busy=true;joinButton.setEnabled(false);diagnosticButton.setEnabled(false);
+  status.setText("Transcribing "+scene.fileName+" offline. Please review all words.");
+  io.execute(()->{
+   try{
+    ArrayList<CaptionSegment> recognized=OfflineTranscriber.transcribe(this,scene.uri,model,
+      percent->runOnUiThread(()->progress.setProgress(Math.max(0,Math.min(99,percent)))));
+    runOnUiThread(()->{
+      scene.subtitles.clear();scene.subtitles.addAll(recognized);
+      scene.caption=CaptionSegment.format(recognized);
+      busy=false;joinButton.setEnabled(true);diagnosticButton.setEnabled(true);
+      progress.setProgress(100);refresh();
+      status.setText(recognized.isEmpty()?"No speech detected; enter captions manually.":"Offline transcription done. Edit and correct captions before export.");
+    });
+   }catch(Exception e){runOnUiThread(()->{
+      busy=false;joinButton.setEnabled(true);diagnosticButton.setEnabled(true);
+      status.setText("Speech recognition failed: "+e.getMessage());
+   });}
+  });
+ }
+ private EditText numberBox(String value){
+  EditText e=new EditText(this);e.setSingleLine(true);e.setText(value);
+  e.setInputType(android.text.InputType.TYPE_CLASS_NUMBER|android.text.InputType.TYPE_NUMBER_FLAG_DECIMAL);
+  return e;
+ }
+ private void trimScene(FlowScene s){
+  if(busy)return;
+  LinearLayout wrap=new LinearLayout(this);wrap.setOrientation(LinearLayout.VERTICAL);wrap.setPadding(dp(18),0,dp(18),0);
+  add(wrap,title("Start seconds",13,false));
+  EditText start=numberBox(String.format(Locale.US,"%.2f",s.trimStartMs/1000.0));add(wrap,start);
+  add(wrap,title("End seconds — max "+String.format(Locale.US,"%.2f",s.durationMs/1000.0),13,false));
+  EditText end=numberBox(String.format(Locale.US,"%.2f",s.trimEndMs/1000.0));add(wrap,end);
+  new AlertDialog.Builder(this).setTitle("Non-destructive scene trim").setView(wrap)
+   .setPositiveButton("Apply",(d,w)->{
+    try{
+      long a=Math.round(Double.parseDouble(start.getText().toString())*1000);
+      long b=Math.round(Double.parseDouble(end.getText().toString())*1000);
+      if(a<0||b>a+s.durationMs||b<=a+100||b>s.durationMs)throw new IllegalArgumentException("Invalid range");
+      s.trimStartMs=a;s.trimEndMs=b;refresh();
+    }catch(Exception e){status.setText("Trim rejected. Use 0 ≤ start < end ≤ clip length.");}
+   }).setNegativeButton("Cancel",null).show();
+ }
+ private void inspectScene(FlowScene s){
+  if(busy)return;
+  status.setText("Inspecting "+s.fileName+"...");
+  io.execute(()->{
+   String report;
+   MediaMetadataRetriever r=new MediaMetadataRetriever();
+   try{
+    r.setDataSource(this,s.uri);
+    String width=r.extractMetadata(MediaMetadataRetriever.METADATA_KEY_VIDEO_WIDTH);
+    String height=r.extractMetadata(MediaMetadataRetriever.METADATA_KEY_VIDEO_HEIGHT);
+    String fps=r.extractMetadata(MediaMetadataRetriever.METADATA_KEY_CAPTURE_FRAMERATE);
+    String rotation=r.extractMetadata(MediaMetadataRetriever.METADATA_KEY_VIDEO_ROTATION);
+    StringBuilder b=new StringBuilder();
+    b.append(s.fileName).append("\nSize: ").append(width).append(" x ").append(height);
+    b.append("\nFPS (if available): ").append(fps==null?"unknown":fps);
+    b.append("\nRotation: ").append(rotation==null?"0":rotation);
+    b.append("\nOriginal length: ").append(s.durationMs/1000.0).append(" sec");
+    b.append("\nSelected range: ").append(s.trimStartMs/1000.0).append(" – ").append(s.trimEndMs/1000.0).append(" sec");
+    b.append("\nAudio: ").append(s.hasAudio?"present":"none");
+    b.append("\nTimed captions: ").append(s.subtitles.size());
+    try{
+      Bitmap frame=r.getScaledFrameAtTime(s.durationMs*500L,MediaMetadataRetriever.OPTION_CLOSEST_SYNC,40,40);
+      if(frame!=null){
+       long sum=0;int count=0;
+       for(int y=0;y<frame.getHeight();y+=2)for(int x=0;x<frame.getWidth();x+=2){
+         int rgb=frame.getPixel(x,y);sum+=(Color.red(rgb)*299+Color.green(rgb)*587+Color.blue(rgb)*114)/1000;count++;
+       }
+       int avg=(int)(sum/Math.max(1,count));
+       b.append("\nMid-frame brightness: ").append(avg).append("/255");
+       if(avg<45)b.append(" (dark — check caption contrast)");
+       frame.recycle();
+      }
+    }catch(Exception ignored){}
+    b.append("\n\nThis is technical media inspection, not object or semantic AI analysis.");
+    report=b.toString();
+   }catch(Exception e){report="Cannot inspect this media: "+e.getMessage();}
+   finally{r.release();}
+   final String response=report;
+   runOnUiThread(()->{
+    status.setText("Technical inspection complete.");
+    new AlertDialog.Builder(this).setTitle("Offline scene inspection").setMessage(response).setPositiveButton("OK",null).show();
+   });
+  });
+ }
+ private void analyzeAll(){
+  if(scenes.isEmpty()){status.setText("Select clips first.");return;}
+  StringBuilder sb=new StringBuilder("OFFLINE MEDIA CHECK\n");
+  long time=0;int noAudio=0;
+  for(FlowScene s:scenes){
+   sb.append("• ").append(s.fileName).append(" — ").append(String.format(Locale.US,"%.2f",s.editingDurationMs()/1000.0)).append("s ");
+   if(!s.hasAudio){sb.append("(silent)");noAudio++;}
+   sb.append("\n");time+=s.editingDurationMs();
+  }
+  sb.append("\nTotal: ").append(String.format(Locale.US,"%.2f",time/1000.0)).append(" seconds");
+  sb.append("\nSilent clips: ").append(noAudio);
+  sb.append("\nMixing HDR, unusual codecs or audio formats can cause export failure. Test 15 seconds first.");
+  new AlertDialog.Builder(this).setTitle("Project analysis").setMessage(sb.toString()).setPositiveButton("OK",null).show();
+ }
+ private void planOffline(){
+  if(scenes.isEmpty()){status.setText("Import clips before planning.");return;}
+  String prompt=directorPrompt.getText().toString();
+  String requested=String.valueOf(styleSpinner.getSelectedItem());
+  String chosen=CreativeDirector.choose(prompt,requested);
+  for(int i=0;i<styleSpinner.getCount();i++)if(chosen.equals(styleSpinner.getItemAtPosition(i)))styleSpinner.setSelection(i);
+  persistProject();
+  String plan=CreativeDirector.describe(scenes,chosen,prompt);
+  ScrollView scroll=new ScrollView(this);TextView out=title(plan,13,false);
+  out.setPadding(dp(16),dp(12),dp(16),dp(20));scroll.addView(out);
+  new AlertDialog.Builder(this).setTitle("Offline Creative Director — recipe plan")
+    .setView(scroll).setPositiveButton("Apply selected style",(d,w)->{
+     status.setText("Style selected: "+chosen+". Enable graphics/captions and render to apply.");
+     persistProject();
+    }).setNegativeButton("Close",null).show();
+ }
+ private String srtTime(long ms){
+  long h=ms/3600000, m=(ms/60000)%60, sec=(ms/1000)%60;
+  return String.format(Locale.US,"%02d:%02d:%02d,%03d",h,m,sec,ms%1000);
+ }
+ private void exportSrt(){
+  if(scenes.isEmpty()){status.setText("Import clips first.");return;}
+  StringBuilder b=new StringBuilder();long timeline=0;int index=0;
+  for(FlowScene s:scenes){
+   for(CaptionSegment cap:s.subtitles){
+    long a=Math.max(cap.startMs,s.trimStartMs),z=Math.min(cap.endMs,s.trimEndMs);
+    if(z<=a||cap.text.trim().isEmpty())continue;
+    b.append(++index).append("\n").append(srtTime(timeline+a-s.trimStartMs))
+     .append(" --> ").append(srtTime(timeline+z-s.trimStartMs))
+     .append("\n").append(cap.text.trim()).append("\n\n");
+   }
+   timeline+=s.editingDurationMs();
+  }
+  if(index==0){status.setText("No timed captions. Use Captions or Transcribe on a clip first.");return;}
+  try{
+   ContentValues values=new ContentValues();
+   values.put(MediaStore.Downloads.DISPLAY_NAME,"CineZehn_Captions_"+System.currentTimeMillis()+".srt");
+   values.put(MediaStore.Downloads.MIME_TYPE,"application/x-subrip");
+   values.put(MediaStore.Downloads.RELATIVE_PATH,Environment.DIRECTORY_DOWNLOADS+"/CineZehn");
+   Uri uri=getContentResolver().insert(MediaStore.Downloads.EXTERNAL_CONTENT_URI,values);
+   if(uri==null)throw new IOException("Downloads destination unavailable");
+   try(OutputStream out=getContentResolver().openOutputStream(uri)){
+    if(out==null)throw new IOException("Cannot write SRT file");
+    out.write(b.toString().getBytes(java.nio.charset.StandardCharsets.UTF_8));
+   }
+   status.setText("Exported "+index+" subtitles to Downloads/CineZehn.");
+  }catch(Exception e){status.setText("Cannot save subtitle file: "+e.getMessage());}
+ }
+ private void persistProject(){
+  if(styleSpinner==null||formatSpinner==null||scenes==null)return;
+  try{
+   JSONObject data=new JSONObject();JSONArray items=new JSONArray();
+   for(FlowScene s:scenes){
+    JSONObject obj=new JSONObject();obj.put("uri",s.uri.toString());obj.put("name",s.fileName);
+    obj.put("duration",s.durationMs);obj.put("audio",s.hasAudio);
+    obj.put("start",s.trimStartMs);obj.put("end",s.trimEndMs);
+    obj.put("captions",s.caption);
+    items.put(obj);
+   }
+   data.put("scenes",items);
+   data.put("style",styleSpinner.getSelectedItemPosition());
+   data.put("format",formatSpinner.getSelectedItemPosition());
+   data.put("graphics",addGraphics.isChecked());data.put("subtitles",addCaptions.isChecked());
+   data.put("crop",cropToFill.isChecked());data.put("outro",addEnd.isChecked());
+   data.put("outroText",endText.getText().toString());data.put("outroLength",endLength.getSelectedItemPosition());
+   data.put("prompt",directorPrompt.getText().toString());
+   try(FileOutputStream out=openFileOutput("cinezehn_last_flow_project.json",MODE_PRIVATE)){
+    out.write(data.toString().getBytes(java.nio.charset.StandardCharsets.UTF_8));
+   }
+  }catch(Exception e){android.util.Log.w("CineZehn","Project autosave failed",e);}
+ }
+ private void restoreProject(){
+  try(FileInputStream in=openFileInput("cinezehn_last_flow_project.json")){
+   ByteArrayOutputStream buffer=new ByteArrayOutputStream();
+   byte[] tmp=new byte[8192];int n;while((n=in.read(tmp))!=-1)buffer.write(tmp,0,n);
+   JSONObject data=new JSONObject(buffer.toString("UTF-8"));
+   styleSpinner.setSelection(data.optInt("style",0));
+   formatSpinner.setSelection(data.optInt("format",0));
+   addGraphics.setChecked(data.optBoolean("graphics",true));
+   addCaptions.setChecked(data.optBoolean("subtitles",true));
+   cropToFill.setChecked(data.optBoolean("crop",false));
+   addEnd.setChecked(data.optBoolean("outro",false));
+   endText.setText(data.optString("outroText","THANKS FOR WATCHING!"));
+   endLength.setSelection(data.optInt("outroLength",1));
+   directorPrompt.setText(data.optString("prompt",""));
+   JSONArray arr=data.optJSONArray("scenes");
+   if(arr!=null)for(int i=0;i<arr.length();i++){
+    JSONObject o=arr.getJSONObject(i);
+    String uri=o.optString("uri","");
+    if(uri.isEmpty())continue;
+    long dur=o.optLong("duration",0);if(dur<100)continue;
+    FlowScene s=new FlowScene(Uri.parse(uri),o.optString("name","Clip"),dur,o.optBoolean("audio",true));
+    s.trimStartMs=Math.max(0,o.optLong("start",0));
+    s.trimEndMs=Math.min(dur,o.optLong("end",dur));
+    if(s.trimEndMs<=s.trimStartMs+100){s.trimStartMs=0;s.trimEndMs=dur;}
+    s.caption=o.optString("captions","");
+    if(!s.caption.isEmpty())s.subtitles.addAll(CaptionSegment.parse(s.caption,dur));
+    scenes.add(s);
+   }
+   refresh();status.setText("Last project restored. Confirm the imported files are still available.");
+  }catch(FileNotFoundException ignored){}catch(Exception e){status.setText("Saved project could not be restored: "+e.getMessage());}
+ }
+
  private File bgImage()throws Exception{
   int w=720,h=1280;
   if(!scenes.isEmpty()){
@@ -162,42 +423,97 @@ public final class FlowJoinActivity extends Activity {
   try(FileOutputStream o=new FileOutputStream(f)){b.compress(Bitmap.CompressFormat.PNG,100,o);}
   b.recycle();return f;
  }
- private void render(){
-  if(busy)return;if(scenes.isEmpty()){status.setText("Import at least one clip.");return;}
-  if(new StatFs(getCacheDir().getPath()).getAvailableBytes()<250*1024*1024L){status.setText("Low storage: free 250 MB or more.");return;}
-  busy=true;joinButton.setEnabled(false);progress.setProgress(3);saved=null;
-  File file=new File(getCacheDir(),"flow-join-"+System.currentTimeMillis()+".mp4");
+ private void render(boolean test){
+  if(busy)return;
+  if(scenes.isEmpty()){status.setText("Select at least one clip first.");return;}
+  if(new StatFs(getCacheDir().getPath()).getAvailableBytes()<300L*1024L*1024L){status.setText("Free 300 MB+ storage for export (long projects need more).");return;}
+  persistProject();
+  ArrayList<FlowScene> selected=new ArrayList<>();
+  long remaining=test?15000L:Long.MAX_VALUE;
+  for(FlowScene s:scenes){
+   if(remaining<=0)break;
+   FlowScene copy=s.copyWithEnd(s.trimStartMs+Math.min(s.editingDurationMs(),remaining));
+   if(copy.editingDurationMs()<100)continue;
+   selected.add(copy);remaining-=copy.editingDurationMs();
+  }
+  if(selected.isEmpty()){status.setText("Your current trims contain no exportable video.");return;}
+  busy=true;joinButton.setEnabled(false);diagnosticButton.setEnabled(false);cancelButton.setEnabled(true);
+  progress.setProgress(2);saved=null;
+  File file=new File(getCacheDir(),"cinezehn-full-"+System.currentTimeMillis()+".mp4");activeExport=file;
   try{
    ArrayList<EditedMediaItem> timeline=new ArrayList<>();
-   for(FlowScene s:scenes)timeline.add(new EditedMediaItem.Builder(MediaItem.fromUri(s.uri)).build());
-   if(addEnd.isChecked()){
+   final int fmt=formatSpinner.getSelectedItemPosition();
+   final int layout=cropToFill.isChecked()?Presentation.LAYOUT_SCALE_TO_FIT_WITH_CROP:Presentation.LAYOUT_SCALE_TO_FIT;
+   for(FlowScene s:selected){
+    MediaItem.ClippingConfiguration clip=new MediaItem.ClippingConfiguration.Builder()
+     .setStartPositionMs(s.trimStartMs).setEndPositionMs(s.trimEndMs).build();
+    MediaItem input=new MediaItem.Builder().setUri(s.uri).setClippingConfiguration(clip).build();
+    ArrayList<Effect> videoEffects=new ArrayList<>();
+    if(fmt==0)videoEffects.add(Presentation.createForWidthAndHeight(720,1280,layout));
+    else if(fmt==1)videoEffects.add(Presentation.createForWidthAndHeight(1280,720,layout));
+    else if(fmt==2)videoEffects.add(Presentation.createForWidthAndHeight(720,720,layout));
+    Effects effects=new Effects(Collections.emptyList(),videoEffects);
+    timeline.add(new EditedMediaItem.Builder(input).setEffects(effects).build());
+   }
+   if(!test&&addEnd.isChecked()){
     long lengthMs=(endLength.getSelectedItemPosition()+3)*1000L;
     MediaItem image=new MediaItem.Builder().setUri(Uri.fromFile(bgImage())).setImageDurationMs(lengthMs).build();
-    String text=endText.getText().toString().trim();
-    if(text.isEmpty())text="THANKS FOR WATCHING!";
-    Effects effects=new Effects(Collections.emptyList(),Collections.singletonList(new OverlayEffect(
-     Collections.singletonList(new EndOverlay(text,lengthMs)))));
-    timeline.add(new EditedMediaItem.Builder(image).setFrameRate(15).setEffects(effects).build());
+    String txt=endText.getText().toString().trim();
+    if(txt.isEmpty())txt="THANKS FOR WATCHING!";
+    ArrayList<Effect> endingFx=new ArrayList<>();
+    if(fmt==0)endingFx.add(Presentation.createForWidthAndHeight(720,1280,layout));
+    else if(fmt==1)endingFx.add(Presentation.createForWidthAndHeight(1280,720,layout));
+    else if(fmt==2)endingFx.add(Presentation.createForWidthAndHeight(720,720,layout));
+    endingFx.add(new OverlayEffect(Collections.singletonList(new EndOverlay(txt,lengthMs))));
+    timeline.add(new EditedMediaItem.Builder(image).setFrameRate(15)
+      .setEffects(new Effects(Collections.emptyList(),endingFx)).build());
    }
-   Composition comp=new Composition.Builder(Collections.singletonList(EditedMediaItemSequence.withAudioAndVideoFrom(timeline))).build();
-   transformer=new Transformer.Builder(this).setAudioMimeType(MimeTypes.AUDIO_AAC).setVideoMimeType(MimeTypes.VIDEO_H264)
-    .setMaxDelayBetweenMuxerSamplesMs(120000L)
+   Composition.Builder builder=new Composition.Builder(Collections.singletonList(
+    EditedMediaItemSequence.withAudioAndVideoFrom(timeline)));
+   if(addGraphics.isChecked()||addCaptions.isChecked()){
+    String style=CreativeDirector.choose(directorPrompt.getText().toString(),String.valueOf(styleSpinner.getSelectedItem()));
+    FlowGraphicsOverlay overlay=new FlowGraphicsOverlay(selected,style,addGraphics.isChecked(),addCaptions.isChecked());
+    builder.setEffects(new Effects(Collections.emptyList(),Collections.singletonList(
+     new OverlayEffect(Collections.singletonList(overlay)))));
+   }
+   Composition composition=builder.build();
+   transformer=new Transformer.Builder(this).setAudioMimeType(MimeTypes.AUDIO_AAC)
+    .setVideoMimeType(MimeTypes.VIDEO_H264).setMaxDelayBetweenMuxerSamplesMs(120000L)
     .addListener(new Transformer.Listener(){
-     @Override public void onCompleted(Composition composition,ExportResult r){
-      stopTicker();status.setText("Video encoded. Saving...");
+     @Override public void onCompleted(Composition composition,ExportResult result){
+      if(!busy)return;
+      stopTicker();status.setText("Encoded. Saving video to Gallery...");
       io.execute(()->{
-       try{Uri u=save(file);runOnUiThread(()->{saved=u;busy=false;joinButton.setEnabled(true);progress.setProgress(100);status.setText("Saved to Movies/CineZehn.");});}
-       catch(Exception e){runOnUiThread(()->failure("Encoded but could not save: "+e.getMessage()));}
+       try{Uri u=save(file);runOnUiThread(()->{
+         saved=u;finishBusy();progress.setProgress(100);
+         status.setText("Saved to Movies/CineZehn. Test audio, captions and timing before publishing.");
+       });}catch(Exception e){failure("Encoded but Gallery save failed: "+e.getMessage());}
        finally{file.delete();}
       });
      }
-     @Override public void onError(Composition composition,ExportResult r,ExportException e){
-      file.delete();failure("MP4 export error "+e.errorCode+": "+e.getMessage()+(e.getCause()==null?"":"\nCause: "+e.getCause()));
+     @Override public void onError(Composition composition,ExportResult result,ExportException e){
+      if(!busy)return;
+      file.delete();failure("Export code "+e.errorCode+": "+e.getMessage()+
+        (e.getCause()==null?"":"\nCause: "+e.getCause()));
      }
     }).build();
-   transformer.start(comp,file.getAbsolutePath());
-   status.setText("Joining original Flow clips, please keep app open.");poll();
-  }catch(Exception e){file.delete();failure("Export setup failed: "+e.getMessage());}
+   transformer.start(composition,file.getAbsolutePath());
+   status.setText(test?"Rendering 15s diagnostic clip...":"Rendering edited Flow clips locally...");
+   poll();
+  }catch(Exception e){file.delete();failure("Cannot start export: "+e.getClass().getSimpleName()+": "+e.getMessage());}
+ }
+ private void finishBusy(){
+  stopTicker();busy=false;joinButton.setEnabled(true);diagnosticButton.setEnabled(true);
+  cancelButton.setEnabled(false);transformer=null;activeExport=null;
+ }
+ private void cancelRender(){
+  if(!busy||transformer==null)return;
+  Transformer old=transformer;
+  finishBusy();
+  try{old.cancel();}catch(Exception ignored){}
+  if(activeExport!=null)activeExport.delete();
+  status.setText("Render cancelled. Original clips and project are unchanged.");
+  progress.setProgress(0);
  }
  private void poll(){
   stopTicker();
@@ -212,7 +528,7 @@ public final class FlowJoinActivity extends Activity {
  }
  private void stopTicker(){if(polling!=null){handler.removeCallbacks(polling);polling=null;}}
  private void failure(String message){runOnUiThread(()->{
-  stopTicker();busy=false;joinButton.setEnabled(true);status.setText(message);
+  finishBusy();status.setText(message);
   new AlertDialog.Builder(this).setTitle("Flow export diagnostic").setMessage(message).setPositiveButton("Copy error",(d,w)->{
    android.content.ClipboardManager cm=(android.content.ClipboardManager)getSystemService(CLIPBOARD_SERVICE);
    cm.setPrimaryClip(ClipData.newPlainText("Flow error",message));
@@ -238,6 +554,7 @@ public final class FlowJoinActivity extends Activity {
  }
  @Override protected void onDestroy(){
   stopTicker();if(transformer!=null&&busy)transformer.cancel();
+  persistProject();
   if(preview!=null)preview.stopPlayback();io.shutdown();super.onDestroy();
  }
 
