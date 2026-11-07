@@ -35,10 +35,14 @@ object VideoEngine {
 
     fun detect(info: MediaInfo, thresholdDb: Int, minSilenceSeconds: Double): List<TimeRange> {
         require(info.hasAudio) { "No audio track found: speech-based silence detection is unavailable." }
-        val args = "-hide_banner -nostdin -i ${quote(info.path)} -vn " +
-            "-af silencedetect=n=${thresholdDb}dB:d=${Timeline.seconds(minSilenceSeconds)} -f null -"
-        val session = FFmpegKit.execute(args)
-        val logs = session.allLogsAsString ?: ""
+        // Passing an argument array avoids FFmpegKit command-line re-parsing of file paths.
+        val args = arrayOf(
+            "-hide_banner", "-nostdin", "-i", info.path, "-vn",
+            "-af", "silencedetect=n=${thresholdDb}dB:d=${Timeline.seconds(minSilenceSeconds)}",
+            "-f", "null", "-"
+        )
+        val session = FFmpegKit.executeWithArguments(args)
+        val logs = session.allLogsAsString.orEmpty()
         if (!ReturnCode.isSuccess(session.returnCode)) {
             throw IllegalStateException("Silence scan failed: ${logs.takeLast(1100)}")
         }
@@ -56,31 +60,31 @@ object VideoEngine {
         require(ranges.isNotEmpty()) { "No audible segment remains. Lower the threshold or turn off silence removal." }
         val outputVideo = info.hasVideo && !options.audioOnly
         require(outputVideo || info.hasAudio) { "Selected file has no audio to export." }
+        // A single massive split graph can exhaust native FFmpeg memory on mobile.
+        require(ranges.size <= 120) {
+            "Too many speech segments (${ranges.size}) for a single-pass export. " +
+                "Try a shorter input or export it in sections."
+        }
+        require(ranges.all { it.start >= 0 && it.end <= info.length + 0.1 && it.end > it.start }) {
+            "Invalid cut positions: rescan the imported media."
+        }
         val graph = createGraph(context, info, ranges, options, sourceSrt)
-        val graphFile = File(context.cacheDir, "graph_${System.nanoTime()}.txt")
-        graphFile.writeText(graph, Charsets.UTF_8)
+        val graphFile = File.createTempFile("sharicut_graph_", ".txt", context.cacheDir)
         try {
-            val base = "-hide_banner -y -nostdin -i ${quote(info.path)} " +
-                "-/filter_complex ${quote(graphFile.absolutePath)} "
-            val cmd = if (outputVideo) {
-                val audioMap = if (info.hasAudio) "-map [aout] -c:a aac -b:a 192k " else "-an "
-                base + "-map [vout] $audioMap -c:v h264_mediacodec -b:v 5000k " +
-                    "-pix_fmt yuv420p -movflags +faststart ${quote(output.absolutePath)}"
-            } else {
-                base + "-map [aout] -vn -c:a aac -b:a 192k ${quote(output.absolutePath)}"
-            }
-            val first = FFmpegKit.execute(cmd)
-            if (ReturnCode.isSuccess(first.returnCode) && output.exists() && output.length() > 0) return
-            // Android devices and FFmpeg distributions vary in available hardware encoders.
-            // An MPEG-4 software encode is a slow but compatible fallback for MP4 exports.
-            if (outputVideo) {
-                output.delete()
-                val fallback = cmd.replace("-c:v h264_mediacodec -b:v 5000k", "-c:v mpeg4 -q:v 3 -r 30")
-                val second = FFmpegKit.execute(fallback)
-                if (ReturnCode.isSuccess(second.returnCode) && output.length() > 0) return
-                throw IllegalStateException("Video export failed. ${second.allLogsAsString?.takeLast(1400) ?: "Unknown error"}")
-            }
-            throw IllegalStateException("Audio export failed. ${first.allLogsAsString?.takeLast(1400) ?: "Unknown error"}")
+            graphFile.writeText(graph, Charsets.UTF_8)
+            output.parentFile?.mkdirs()
+            // Software MPEG4 export avoids device-specific MediaCodec encoder crashes.
+            // It is slower but more portable across Android chips.
+            val args = ExportCommand.arguments(
+                info.path, graphFile.absolutePath, output.absolutePath, outputVideo, info.hasAudio
+            )
+            val session = FFmpegKit.executeWithArguments(args)
+            if (ReturnCode.isSuccess(session.returnCode) && output.isFile && output.length() > 0L) return
+            output.delete()
+            val logs = session.allLogsAsString.orEmpty().takeLast(2000)
+            throw IllegalStateException(
+                "Export engine failed (code ${session.returnCode}). ${logs.ifBlank { "No FFmpeg diagnostic was returned." }}"
+            )
         } finally {
             graphFile.delete()
         }
@@ -170,5 +174,5 @@ object VideoEngine {
         return parts.joinToString(";\n")
     }
 
-    private fun quote(value: String) = "\"${value.replace("\\", "\\\\").replace("\"", "\\\"")}\""
+
 }

@@ -179,7 +179,12 @@ class MainActivity : ComponentActivity() {
                 didScan = true
                 val keep = Timeline.keepRanges(media.length, scanResults, pad.toDouble(), pause.toDouble())
                 notice = "Scan complete • ${scanResults.size} silent parts • ${durationText(media.length - Timeline.duration(keep))} removable."
+            } catch (e: LinkageError) {
+                android.util.Log.e("ShariCutExport", "Silence scanner library load failed", e)
+                notice = "Silence scanner failed to load. Install the latest APK."
+                didScan = false
             } catch (e: Exception) {
+                android.util.Log.e("ShariCutExport", "Silence scan failed", e)
                 notice = "Scan error: ${e.message}"
                 didScan = false
             } finally { busy = false }
@@ -222,8 +227,12 @@ class MainActivity : ComponentActivity() {
                 scanResults = result.first.third
                 didScan = true
                 notice = "Export saved • ${durationText(result.third)} • ${if (exportedWasVideo) "Movies" else "Music"}/ShariCut Studio"
+            } catch (e: LinkageError) {
+                android.util.Log.e("ShariCutExport", "Native FFmpeg library load failed", e)
+                notice = "Export engine could not load. Please install the updated APK. ${e.message.orEmpty()}"
             } catch (e: Exception) {
-                notice = "Export failed: ${e.message}"
+                android.util.Log.e("ShariCutExport", "Export failed", e)
+                notice = "Export failed: ${e.message ?: e.javaClass.simpleName}"
             } finally { busy = false }
         }
     }
@@ -594,7 +603,7 @@ class MainActivity : ComponentActivity() {
             Text("• Outputs are available under Movies or Music / ShariCut Studio.", color = muted, fontSize = 12.sp)
         }
         PanelCard {
-            Text("SHARICUT STUDIO PRO  •  v1.0", fontWeight = FontWeight.Bold)
+            Text("SHARICUT STUDIO PRO  •  v1.0.1", fontWeight = FontWeight.Bold)
             Text("Open-source Android starter implementation built with Kotlin, Jetpack Compose and FFmpeg. See README for dependencies, testing and third-party licensing.", color = muted, fontSize = 12.sp)
         }
     }
