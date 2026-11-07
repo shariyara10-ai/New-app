@@ -92,7 +92,7 @@ public class MainActivity extends Activity {
   });
   setContentView(scroll);
   add(root,label("SHARI / AUTOCUT OFFLINE",13,aqua,true),0);
-  add(root,label("AI-assisted Video Editor",26,Color.WHITE,true),7);
+  add(root,label("AI Director + Video Editor",26,Color.WHITE,true),7);
   add(root,label("100% phone-based media editing. No desktop server, account or API key required. Offline Vosk model imported separately.",13,Color.rgb(177,191,210),false),9);
   LinearLayout media=panel();
   add(media,label("1  Import video or narration",17,Color.WHITE,true),0);
@@ -129,9 +129,11 @@ public class MainActivity extends Activity {
   transcript.setBackgroundColor(Color.rgb(32,43,62));transcript.setPadding(d(12),d(12),d(12),d(12));add(edit,transcript,10);
   Button romanize=btn("Approx. Romanize Urdu/Hindi → Latin");add(edit,romanize,9);romanize.setOnClickListener(v->romanizeText());
   add(edit,label("Auto planner style",12,Color.rgb(176,194,213),true),11);
-  preset=new Spinner(this);preset.setAdapter(spinnerAdapter(new String[]{"Documentary","Shorts","Explainer"}));add(edit,preset,6);
+  preset=new Spinner(this);preset.setAdapter(spinnerAdapter(DirectorEngine.STYLES));add(edit,preset,6);
   autoButton=btn("Plan caption motion from transcript");add(edit,autoButton,8);autoButton.setOnClickListener(v->plan());
   Button prompt=btn("Generate visual/PNG asset prompts");add(edit,prompt,8);prompt.setOnClickListener(v->showPrompts());
+  Button director=btn("AI Director Chat (offline commands)");add(edit,director,9);director.setOnClickListener(v->showDirector());
+  Button library=btn("Browse built-in creative recipe library");add(edit,library,8);library.setOnClickListener(v->showLibrary());
   Button png=btn("Add one optional PNG overlay image");add(edit,png,8);png.setOnClickListener(v->choose("image/png",PICK_PNG));
 
   LinearLayout out=panel();
@@ -143,7 +145,7 @@ public class MainActivity extends Activity {
   Button share=btn("Share last export");add(out,share,6);share.setOnClickListener(v->shareExport());
   progress=new ProgressBar(this,null,android.R.attr.progressBarStyleHorizontal);progress.setMax(100);add(out,progress,9);
   status=label("Ready. Import a media file; paste transcript or add an offline speech model.",13,Color.rgb(191,211,226),false);add(out,status,9);
-  add(root,label("Local processing: Media3 Transformer + Vosk. Rule-based caption styles, not a cloud LLM. This experimental release may fail on unsupported codecs and large videos.",12,Color.rgb(146,161,182),false),22);
+  add(root,label("Local processing: Media3 Transformer + Vosk. Offline Director is rule-based; no LLM is bundled. This experimental release may fail on unsupported codecs and large videos.",12,Color.rgb(146,161,182),false),22);
   refreshModel();
  }
  private ArrayAdapter<String> spinnerAdapter(String[] items){
@@ -266,7 +268,7 @@ public class MainActivity extends Activity {
    update("Rough Latin transliteration generated. Edit Hinglish pronunciation manually.");
   }catch(Exception ex){error("Romanization not supported on this device.");}
  }
- private String presetValue(){int i=preset.getSelectedItemPosition();return i==0?"documentary":i==1?"shorts":"explainer";}
+ private String presetValue(){return String.valueOf(preset.getSelectedItem()).toLowerCase(Locale.ROOT);}
  private ArrayList<CaptionSegment> parsed() {
   long clipDuration=Math.max(1000,durationMs);
   return CaptionSegment.parse(transcript.getText().toString(),clipDuration);
@@ -287,6 +289,23 @@ public class MainActivity extends Activity {
     android.content.ClipboardManager cm=(android.content.ClipboardManager)getSystemService(CLIPBOARD_SERVICE);
     cm.setPrimaryClip(android.content.ClipData.newPlainText("AutoCut prompts",text));update("Prompts copied to clipboard.");
    }).setNegativeButton("Close",null).show();
+ }
+ private void showDirector(){
+  EditText command=new EditText(this);command.setHint("Example: Netflix-style documentary, strong captions, cinematic zooms");command.setMinLines(3);
+  new AlertDialog.Builder(this).setTitle("Offline AI Director — rule-based beta")
+   .setMessage("Runs without internet. This version interprets a limited set of style commands; it is not a local ChatGPT model.")
+   .setView(command).setPositiveButton("Apply to captions",(dlg,w)->{
+     ArrayList<CaptionSegment> current=parsed();
+     String report=DirectorEngine.run(command.getText().toString(),current,presetValue());
+     if(!current.isEmpty()){scenes=current;transcript.setText(CaptionSegment.format(current));}
+     new AlertDialog.Builder(this).setTitle("Director plan").setMessage(report).setPositiveButton("OK",null).show();
+   }).setNegativeButton("Cancel",null).show();
+ }
+ private void showLibrary(){
+  StringBuilder b=new StringBuilder("Installed procedural recipe catalog (not downloadable stock assets):\\n\\n");
+  for(String asset:DirectorEngine.ASSETS)b.append("• ").append(asset).append("\\n");
+  b.append("\\nOnly caption overlays and one imported PNG can currently be rendered. These recipes are planning suggestions, not complete animations.");
+  new AlertDialog.Builder(this).setTitle("Offline Creative Library").setMessage(b.toString()).setPositiveButton("OK",null).show();
  }
  private long[] trimTimes(){
   try{
