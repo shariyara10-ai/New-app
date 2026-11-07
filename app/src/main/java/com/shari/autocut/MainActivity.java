@@ -94,6 +94,11 @@ public class MainActivity extends Activity {
   add(root,label("SHARI / AUTOCUT OFFLINE",13,aqua,true),0);
   add(root,label("AI Director + Video Editor",26,Color.WHITE,true),7);
   add(root,label("100% phone-based media editing. No desktop server, account or API key required. Offline Vosk model imported separately.",13,Color.rgb(177,191,210),false),9);
+  LinearLayout flow=panel();
+  add(flow,label("FLOW / VEO SCENE JOINER",17,Color.WHITE,true),0);
+  add(flow,label("Join your generated 8-second clips, keep their original dialogue, then add an animated Like, Comment, Subscribe ending. Memes disabled in this mode.",12,Color.rgb(187,202,216),false),6);
+  Button flowOpen=btn("Open Flow Clip Joiner");
+  add(flow,flowOpen,8);flowOpen.setOnClickListener(v->startActivity(new Intent(this,FlowJoinActivity.class)));
   LinearLayout media=panel();
   add(media,label("1  Import video or narration",17,Color.WHITE,true),0);
   Button pick=btn("Choose Video / Audio");add(media,pick,12);pick.setOnClickListener(v->choose("video/*\n audio/*",PICK_MEDIA));
