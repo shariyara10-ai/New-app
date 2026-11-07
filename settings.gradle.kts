@@ -12,5 +12,5 @@ dependencyResolutionManagement {
         mavenCentral()
     }
 }
-rootProject.name = 'ShariTTS'
-include ':app'
+rootProject.name = "AiVoiceGen"
+include(":app")
