@@ -4,6 +4,13 @@
 
 Native Android app: media files from device storage, video preview, editable time-coded captions, offline speech recognition with a user-installed Vosk model, rule-based motion style planning, animated burned-in captions, optional imported PNG sticker, trim/crop, Media3 Transformer encoding, audio-only narration to captioned video, MP4 saved into Movies/CineZehn.
 
+## v0.4.2 speech model download recovery
+- Automatic retry from the public Hugging Face LocalStack model mirror when the official Vosk model host fails DNS/connection.
+- Known SHA-256 checks maintained for English and Indian English model ZIPs; archives validated and safety-limited during import.
+- Explicit browser shortcut to model mirror and import-ZIP fallback.
+- Play/Pause button on the main video preview to avoid confusion over a blank unplayed VideoView.
+- This fixes error handling and alternative download routes, not root-cause Internet DNS access; on-device tests remain necessary.
+
 ## v0.4.1 independent installation / launcher recovery
 - Android `applicationId` changed from `com.shari.autocut.offline` to `com.cinezehn.aistudio`, so the new CineZehn APK installs alongside the older AutoCut package rather than updating it.
 - Dedicated visible vector launcher icon is provided; the app retains MAIN/LAUNCHER intent-filter.

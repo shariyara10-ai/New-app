@@ -6,8 +6,8 @@ android {
   applicationId 'com.cinezehn.aistudio'
   minSdk 29
   targetSdk 35
-  versionCode 10
-  versionName '0.4.1-independent-install'
+  versionCode 11
+  versionName '0.4.2-model-download-recovery'
  }
  compileOptions {
   sourceCompatibility JavaVersion.VERSION_17

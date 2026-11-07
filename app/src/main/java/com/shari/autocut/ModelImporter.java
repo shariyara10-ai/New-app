@@ -13,59 +13,68 @@ public class ModelImporter {
  private static final long MAX_ARCHIVE=150L*1024L*1024L;
  private static final long MAX_UNPACKED=650L*1024L*1024L;
  private static final String MODEL_URL="https://alphacephei.com/vosk/models/";
+ private static final String MIRROR_URL="https://huggingface.co/localstack/vosk-models/resolve/main/";
  private static final String EN_US_SHA="30f26242c4eb449f948e42cb302dd7a686cb29a3423a8367f99ff41780942498";
  private static final String EN_IN_SHA="20663dcac4d5cb783a579c54d98339344a688e4ec6e1b4a4b059fd1235454cc7";
 
- public static File downloadAndInstall(Context ctx, String language, Progress progress) throws Exception {
+ public static File downloadAndInstall(Context ctx,String language,Progress progress)throws Exception{
   final String filename;
   final String expectedSha;
-  if("hindi".equals(language)) {
-   filename="vosk-model-small-hi-0.22.zip";expectedSha=null;
-  }else if("indian_english".equals(language)) {
-   filename="vosk-model-small-en-in-0.4.zip";expectedSha=EN_IN_SHA;
-  }else {
-   filename="vosk-model-small-en-us-0.15.zip";expectedSha=EN_US_SHA;
-  }
-  File downloaded=new File(ctx.getCacheDir(),"vosk-download-"+System.currentTimeMillis()+".zip");
-  HttpURLConnection con=null;
-  try {
-   URL u=new URL(MODEL_URL+filename);
-   con=(HttpURLConnection)u.openConnection();
-   con.setConnectTimeout(30000);
-   con.setReadTimeout(60000);
-   con.setInstanceFollowRedirects(true);
-   con.setRequestProperty("User-Agent","CineZehnAIStudio/0.3.2");
-   con.connect();
-   if(con.getResponseCode()!=200)throw new IOException("Official download HTTP "+con.getResponseCode()+". Try manual ZIP download.");
-   long total=con.getContentLengthLong();
-   if(total>MAX_ARCHIVE)throw new IOException("Download too large; use a small Vosk model.");
-   long got=0;int last=-1;
-   MessageDigest digest=MessageDigest.getInstance("SHA-256");
-   try(InputStream in=new BufferedInputStream(con.getInputStream());OutputStream out=new BufferedOutputStream(new FileOutputStream(downloaded))) {
-    byte[] chunk=new byte[65536];int n;
-    while((n=in.read(chunk))!=-1){
-     got+=n;
-     if(got>MAX_ARCHIVE)throw new IOException("Download exceeded safe maximum.");
-     digest.update(chunk,0,n);
-     out.write(chunk,0,n);
-     if(total>0 && progress!=null) {
-      int p=(int)Math.min(100,100d*got/total);
-      if(p>=last+5){last=p;progress.update(p);}
+  if("hindi".equals(language)){filename="vosk-model-small-hi-0.22.zip";expectedSha=null;}
+  else if("indian_english".equals(language)){filename="vosk-model-small-en-in-0.4.zip";expectedSha=EN_IN_SHA;}
+  else{filename="vosk-model-small-en-us-0.15.zip";expectedSha=EN_US_SHA;}
+  String[] hosts=new String[]{MODEL_URL+filename,MIRROR_URL+filename};
+  IOException last=null;
+  for(int attempt=0;attempt<hosts.length;attempt++){
+   File cache=new File(ctx.getCacheDir(),"vosk-download-"+System.currentTimeMillis()+"-"+attempt+".zip");
+   HttpURLConnection connection=null;
+   try{
+    if(progress!=null)progress.update(0);
+    URL address=new URL(hosts[attempt]);
+    connection=(HttpURLConnection)address.openConnection();
+    connection.setConnectTimeout(12000);
+    connection.setReadTimeout(45000);
+    connection.setInstanceFollowRedirects(true);
+    connection.setRequestProperty("User-Agent","CineZehnAIStudio/0.4.2");
+    connection.setRequestProperty("Accept","application/octet-stream,application/zip,*/*");
+    connection.connect();
+    int code=connection.getResponseCode();
+    if(code!=200)throw new IOException("Model source "+(attempt+1)+" returned HTTP "+code);
+    long length=connection.getContentLengthLong();
+    if(length>MAX_ARCHIVE)throw new IOException("Model exceeds supported archive size.");
+    long got=0;int lastProgress=-1;
+    MessageDigest digest=MessageDigest.getInstance("SHA-256");
+    try(InputStream in=new BufferedInputStream(connection.getInputStream());
+        OutputStream out=new BufferedOutputStream(new FileOutputStream(cache))){
+     byte[] data=new byte[65536];int n;
+     while((n=in.read(data))!=-1){
+      got+=n;
+      if(got>MAX_ARCHIVE)throw new IOException("Download exceeded safe 150MB limit.");
+      digest.update(data,0,n);out.write(data,0,n);
+      if(length>0&&progress!=null){
+       int p=(int)Math.min(99,100d*got/length);
+       if(p>=lastProgress+5){lastProgress=p;progress.update(p);}
+      }
      }
     }
+    if(got<5L*1024*1024)throw new IOException("Received non-model or incomplete ZIP; file too small.");
+    if(length>0&&got!=length)throw new IOException("Incomplete ZIP download.");
+    String sha=toHex(digest.digest());
+    if(expectedSha!=null&&!expectedSha.equalsIgnoreCase(sha))
+      throw new IOException("Model SHA-256 check failed; refused untrusted or damaged download.");
+    File valid=installFile(ctx,cache);
+    if(progress!=null)progress.update(100);
+    return valid;
+   }catch(IOException e){
+    last=e;
+    android.util.Log.w("CineZehn","Model source "+(attempt+1)+" failed: "+e.getClass().getSimpleName());
+   }finally{
+    if(connection!=null)connection.disconnect();
+    cache.delete();
    }
-   if(got<5L*1024L*1024L)throw new IOException("Downloaded file is too small to be a Vosk model ZIP ("+got+" bytes).");
-   if(total>0&&got!=total)throw new IOException("Download incomplete ("+got+" of "+total+" bytes). Try again on stable Wi-Fi.");
-   String actual=toHex(digest.digest());
-   if(expectedSha!=null&&!expectedSha.equalsIgnoreCase(actual))
-    throw new IOException("ZIP failed SHA-256 verification. Download incomplete/corrupted. Delete it and retry on Wi-Fi.");
-   File installed=installFile(ctx,downloaded);
-   if(progress!=null)progress.update(100);
-   return installed;
-  } finally {
-   if(con!=null)con.disconnect();
-   downloaded.delete();
   }
+  throw new IOException("Both model servers failed ("+(last==null?"unknown":last.getClass().getSimpleName())+
+   "). Check Wi-Fi/mobile data, Private DNS or VPN. Or download the original model ZIP in Chrome from huggingface.co/localstack/vosk-models and tap Import ZIP.");
  }
  private static String toHex(byte[] bytes) {
   StringBuilder sb=new StringBuilder();

@@ -106,6 +106,13 @@ public class MainActivity extends Activity {
   preview=new VideoView(this);preview.setBackgroundColor(Color.BLACK);
   LinearLayout.LayoutParams vp=new LinearLayout.LayoutParams(-1,d(205));vp.topMargin=d(12);media.addView(preview,vp);
   MediaController mc=new MediaController(this);mc.setAnchorView(preview);preview.setMediaController(mc);
+  Button playPreview=btn("▶ Play / Pause Video Preview");
+  add(media,playPreview,7);
+  playPreview.setOnClickListener(v->{
+   if(source==null||isAudioOnly){error("Select a video file first.");return;}
+   try{if(preview.isPlaying())preview.pause();else preview.start();}
+   catch(Exception e){error("Preview playback failed: "+e.getMessage());}
+  });
   LinearLayout trimRow=new LinearLayout(this);trimRow.setOrientation(LinearLayout.HORIZONTAL);
   startField=smallField("Start sec", "0");endField=smallField("End sec","30");
   trimRow.addView(startField,new LinearLayout.LayoutParams(0,d(52),1f));
@@ -122,9 +129,14 @@ public class MainActivity extends Activity {
   Button downloadEnglish=btn("Download & install English model (~40 MB)");add(model,downloadEnglish,9);downloadEnglish.setOnClickListener(v->downloadModel("english"));
   Button downloadHindi=btn("Download & install Hindi model (~42 MB)");add(model,downloadHindi,7);downloadHindi.setOnClickListener(v->downloadModel("hindi"));
   Button downloadIndian=btn("Download & install Indian English model (~36 MB)");add(model,downloadIndian,7);downloadIndian.setOnClickListener(v->downloadModel("indian_english"));
+  Button mirror=btn("Open alternate Vosk model mirror (browser)");add(model,mirror,8);
+  mirror.setOnClickListener(v->{
+   Intent i=new Intent(Intent.ACTION_VIEW,Uri.parse("https://huggingface.co/localstack/vosk-models/tree/main"));
+   startActivity(i);
+  });
   Button importModel=btn("Or import existing Vosk model ZIP");add(model,importModel,9);importModel.setOnClickListener(v->choose("application/zip",PICK_MODEL));
   transcribeButton=btn("Transcribe selected audio OFFLINE");add(model,transcribeButton,9);transcribeButton.setOnClickListener(v->transcribe());
-  add(model,label("Use small English or Hindi Vosk models. Urdu has no matching small-model guarantee. Hinglish code-switching and Roman spelling may be inaccurate; always correct captions.",12,Color.rgb(164,178,196),false),11);
+  add(model,label("Models can be downloaded once and then work offline. Official download retries from a verified model mirror if connection fails. Urdu has no matching small-model guarantee. Hinglish code-switching and Roman spelling may be inaccurate; always correct captions.",12,Color.rgb(164,178,196),false),11);
 
   LinearLayout edit=panel();
   add(edit,label("3  Transcript & caption timeline",17,Color.WHITE,true),0);
@@ -220,12 +232,12 @@ public class MainActivity extends Activity {
  private void downloadModel(String language){
   if(busy)return;
   setBusy(true);
-  modelStatus.setText("Downloading model from official Vosk website...");
+  modelStatus.setText("Downloading from official server; alternate mirror will be tried automatically...");
   update("Downloading model; keep this app open and use a stable connection.");
   jobs.execute(()->{
    try{
     File m=ModelImporter.downloadAndInstall(this,language,p->runOnUiThread(()->{
-     if(modelStatus!=null)modelStatus.setText("Downloading official "+language+" model: "+p+"%");
+     if(modelStatus!=null)modelStatus.setText("Downloading "+language+" model (official/mirror): "+p+"%");
      if(progress!=null)progress.setProgress(p);
     }));
     runOnUiThread(()->{
