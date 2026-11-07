@@ -28,7 +28,7 @@ public final class FlowJoinActivity extends Activity {
  private LinearLayout root, list;
  private TextView summary,status;
  private EditText endText;
- private CheckBox addEnd,addCaptions,addGraphics,cropToFill;
+ private CheckBox addEnd,addCaptions,addGraphics,cropToFill,addHost;
  private Spinner endLength,styleSpinner,formatSpinner;
  private EditText directorPrompt;
  private Button cancelButton,diagnosticButton;
@@ -85,6 +85,8 @@ public final class FlowJoinActivity extends Activity {
   Button plan=button("Generate offline editing plan");add(creative,plan);plan.setOnClickListener(v->planOffline());
   addGraphics=new CheckBox(this);addGraphics.setText("Animated progress, scene numbers and contextual graphics");addGraphics.setChecked(true);add(creative,addGraphics);
   addCaptions=new CheckBox(this);addCaptions.setText("Burn-in edited / transcribed captions");addCaptions.setChecked(true);add(creative,addCaptions);
+  addHost=new CheckBox(this);addHost.setText("Add original animated 2D explainer host");addHost.setChecked(false);add(creative,addHost);
+  add(creative,title("Host has procedural face/hand gestures based on supplied text, not neural lip-sync or realistic AI animation.",12,false));
   Button exportSrt=button("Export subtitle SRT to Downloads");add(creative,exportSrt);exportSrt.setOnClickListener(v->exportSrt());
   LinearLayout outputLayout=panel("4  Video shape and export quality");
   formatSpinner=new Spinner(this);
@@ -113,6 +115,12 @@ public final class FlowJoinActivity extends Activity {
   status=title("Ready — add your clips.",13,false);add(output,status);
   add(root,title("All processing on-device. Vosk transcription requires a separately installed model. Complex effects and mixed codecs/HDR may fail on some phones; the 15-second test helps diagnose.",12,false));
   restoreProject();
+  String incoming=getIntent().getStringExtra("director_prompt");
+  String presetName=getIntent().getStringExtra("director_style");
+  if(incoming!=null&&!incoming.trim().isEmpty())directorPrompt.setText(incoming);
+  if(presetName!=null)for(int i=0;i<styleSpinner.getCount();i++)
+    if(String.valueOf(styleSpinner.getItemAtPosition(i)).equalsIgnoreCase(presetName))
+      styleSpinner.setSelection(i);
  }
  private void select(){
   if(busy)return;
@@ -363,7 +371,7 @@ public final class FlowJoinActivity extends Activity {
    data.put("style",styleSpinner.getSelectedItemPosition());
    data.put("format",formatSpinner.getSelectedItemPosition());
    data.put("graphics",addGraphics.isChecked());data.put("subtitles",addCaptions.isChecked());
-   data.put("crop",cropToFill.isChecked());data.put("outro",addEnd.isChecked());
+   data.put("crop",cropToFill.isChecked());data.put("host",addHost.isChecked());data.put("outro",addEnd.isChecked());
    data.put("outroText",endText.getText().toString());data.put("outroLength",endLength.getSelectedItemPosition());
    data.put("prompt",directorPrompt.getText().toString());
    try(FileOutputStream out=openFileOutput("cinezehn_last_flow_project.json",MODE_PRIVATE)){
@@ -381,6 +389,7 @@ public final class FlowJoinActivity extends Activity {
    addGraphics.setChecked(data.optBoolean("graphics",true));
    addCaptions.setChecked(data.optBoolean("subtitles",true));
    cropToFill.setChecked(data.optBoolean("crop",false));
+   addHost.setChecked(data.optBoolean("host",false));
    addEnd.setChecked(data.optBoolean("outro",false));
    endText.setText(data.optString("outroText","THANKS FOR WATCHING!"));
    endLength.setSelection(data.optInt("outroLength",1));
@@ -471,9 +480,9 @@ public final class FlowJoinActivity extends Activity {
    }
    Composition.Builder builder=new Composition.Builder(Collections.singletonList(
     EditedMediaItemSequence.withAudioAndVideoFrom(timeline)));
-   if(addGraphics.isChecked()||addCaptions.isChecked()){
+   if(addGraphics.isChecked()||addCaptions.isChecked()||addHost.isChecked()){
     String style=CreativeDirector.choose(directorPrompt.getText().toString(),String.valueOf(styleSpinner.getSelectedItem()));
-    FlowGraphicsOverlay overlay=new FlowGraphicsOverlay(selected,style,addGraphics.isChecked(),addCaptions.isChecked());
+    FlowGraphicsOverlay overlay=new FlowGraphicsOverlay(selected,style,addGraphics.isChecked(),addCaptions.isChecked(),addHost.isChecked());
     builder.setEffects(new Effects(Collections.emptyList(),Collections.singletonList(
      new OverlayEffect(Collections.singletonList(overlay)))));
    }
