@@ -33,6 +33,8 @@ public final class StudioProject {
   public String prompt="",caption="",narration="",motion="Slow Zoom",graphics="",sfx="",transition="Cut",captionStyle="Bold Pop";
   public Uri visual=null,host=null;
   public String hostMotion="Float";
+  public boolean hostEnabled=false;
+  public int overlaySlots=3;
   public final Uri[] overlays=new Uri[5];
   public final String[] overlayPrompts=new String[5];
   public final String[] overlayMotion=new String[5];
@@ -172,7 +174,8 @@ public final class StudioProject {
     .put("motion",s.motion).put("graphics",s.graphics).put("sfx",s.sfx)
     .put("transition",s.transition).put("captionStyle",s.captionStyle)
     .put("visual",s.visual==null?"":s.visual.toString())
-    .put("host",s.host==null?"":s.host.toString()).put("hostMotion",s.hostMotion);
+    .put("host",s.host==null?"":s.host.toString()).put("hostMotion",s.hostMotion)
+    .put("hostEnabled",s.hostEnabled).put("overlaySlots",s.overlaySlots);
    JSONArray overlayUris=new JSONArray(),overlayPrompts=new JSONArray(),overlayMotions=new JSONArray();
    for(int i=0;i<5;i++){
     overlayUris.put(s.overlays[i]==null?"":s.overlays[i].toString());
@@ -210,6 +213,8 @@ public final class StudioProject {
    String image=x.optString("visual","");if(!image.isEmpty())s.visual=Uri.parse(image);
    String host=x.optString("host","");if(!host.isEmpty())s.host=Uri.parse(host);
    s.hostMotion=x.optString("hostMotion","Float");
+   s.hostEnabled=x.optBoolean("hostEnabled",false);
+   s.overlaySlots=Math.max(1,Math.min(5,x.optInt("overlaySlots",3)));
    JSONArray u=x.optJSONArray("overlays"),p=x.optJSONArray("overlayPrompts"),m=x.optJSONArray("overlayMotion");
    for(int i=0;i<5;i++){
     if(u!=null){String uri=u.optString(i,"");if(!uri.isEmpty())s.overlays[i]=Uri.parse(uri);}
