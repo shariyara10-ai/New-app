@@ -17,7 +17,7 @@ import java.util.*;
  * Every chosen visual is passed to the real manual editor and renderer.
  */
 public final class StoryboardPlannerActivity extends Activity {
- private static final int PICK_ASSET=812,PICK_AUDIO=813;
+ private static final int PICK_ASSET=812,PICK_AUDIO=813,MAKE_PNG=814;
  private static final int BASE=0xFF0C0E18,SURFACE=0xFF191C2C,ACCENT=0xFF835BF6,TEXT=0xFFF9F8FF,MUTED=0xFFAAAEC5;
  private StudioProject project;
  private int selected=0,assetType=-1,tab=0;
@@ -181,6 +181,8 @@ public final class StoryboardPlannerActivity extends Activity {
   EditText visualPrompt=edit("Visual description",shot.prompt,4);
   add(main,visualPrompt,8);
   visualPrompt.addTextChangedListener(watch(s->{shot.prompt=s;save();}));
+  Button make=button("✦  CREATE PNG IN OFFLINE ASSET STUDIO",false);add(main,make,7);
+  make.setOnClickListener(v->{assetType=-1;startActivityForResult(new Intent(this,AssetGeneratorStudioActivity.class),MAKE_PNG);});
   Button copy=button("Copy visual generation prompt",false);add(main,copy,8);
   copy.setOnClickListener(v->copy(shot.prompt));
   add(main,text("MAIN IMAGE / VIDEO SOURCE",11,true,0xFFD1BCFF),17);
@@ -238,6 +240,8 @@ public final class StoryboardPlannerActivity extends Activity {
    add(item,text("OVERLAY "+(j+1)+"/"+shot.overlaySlots,13,true,TEXT),0);
    EditText prompt=edit("Describe image/logo/PNG",shot.overlayPrompts[j],2);add(item,prompt,9);
    prompt.addTextChangedListener(watch(s->{shot.overlayPrompts[layer]=s;save();}));
+   Button generate=button("Create PNG graphics for this overlay",false);add(item,generate,7);
+   generate.setOnClickListener(v->{assetType=layer;startActivityForResult(new Intent(this,AssetGeneratorStudioActivity.class),MAKE_PNG);});
    Button cpLayer=button("Copy PNG prompt",false);add(item,cpLayer,7);
    cpLayer.setOnClickListener(v->copy(shot.overlayPrompts[layer]));
    assetBox(item,shot.overlays[j],layer,"Upload transparent PNG / illustration");
@@ -311,7 +315,7 @@ public final class StoryboardPlannerActivity extends Activity {
    finally{try{reader.release();}catch(Exception ignored){}}
    project.audioUri=uri;
    if(duration>1000)project.durationMs=duration;
-  }else if(request==PICK_ASSET&&!project.shots.isEmpty()){
+  }else if((request==PICK_ASSET||request==MAKE_PNG)&&!project.shots.isEmpty()){
    StudioProject.Shot shot=chosen();
    if(assetType==-1)shot.visual=uri;
    else if(assetType==-2){shot.host=uri;shot.hostEnabled=true;}

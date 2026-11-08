@@ -15,7 +15,7 @@ JNIEXPORT jstring JNICALL Java_com_shari_autocut_WhisperBridge_transcribeNative(
     return env->NewStringUTF("ERROR\tCould not load Whisper GGML model");}
   whisper_full_params p=whisper_full_default_params(WHISPER_SAMPLING_GREEDY);
   p.n_threads=std::max(1,std::min(4,(int)threads));
-  p.language=std::string(lang)=="auto"?nullptr:lang;
+  p.language=lang; // Whisper understands explicit "auto" multilingual detection mode
   p.translate=false;p.print_progress=false;p.print_realtime=false;
   p.print_timestamps=false;p.print_special=false;p.no_context=true;
   jsize count=env->GetArrayLength(audio);

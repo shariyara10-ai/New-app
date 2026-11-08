@@ -1,8 +1,15 @@
-# CineZehn AI Studio — v0.6.0 Pro Storyboard Editor
+# CineZehn AI Studio PRO — v0.8.0 Advanced Storyboard + Whisper Beta
 
 **This APK works on an Android phone without a PC, local server, OpenAI API, cloud account, or subscription.**
 
 Native Android app: media files from device storage, video preview, editable time-coded captions, offline speech recognition with a user-installed Vosk model, rule-based motion style planning, animated burned-in captions, optional imported PNG sticker, trim/crop, Media3 Transformer encoding, audio-only narration to captioned video, MP4 saved into Movies/CineZehn.
+
+## v0.8.0 Offline PNG asset generation
+- New independent **Asset Generator Studio** creates actual original PNG files: text badges, labels, numbered graphics, arrow pointers, callout bubbles, highlights and infographic shapes in selectable colors, transparency and sizes.
+- Transparent PNGs saved in Pictures/CineZehn/Assets; dedicated insert action returns created image to a selected main storyboard asset or one of five overlays.
+- This is a procedural/vector renderer, NOT a neural diffusion or AI image/video generation service.
+- Prompt-based photorealistic assets still require an external generator then user import.
+- The Auto Planner, Pro Editor and Flow Clip Merger remain separate.
 
 ## v0.7.0 native Whisper integration (Android ARM64, experimental)
 - Native JNI inference uses the official open-source **ggml-org/whisper.cpp v1.9.5** sources, pinned and fetched at CI build time.
