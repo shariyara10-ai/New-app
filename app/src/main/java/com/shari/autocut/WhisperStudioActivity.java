@@ -60,7 +60,9 @@ public final class WhisperStudioActivity extends Activity {
   add(root,title("Real local whisper.cpp speech recognition • import a multilingual GGML model once • no cloud required.",12,false,MUTED),10);
   LinearLayout models=section(root,"01 • Offline Whisper model");
   modelStatus=title("Checking model...",13,false,MUTED);add(models,modelStatus,10);
-  Button importModel=button("Import Whisper .bin model from Downloads",true);
+  Button installTiny=button("⬇ Download & install Whisper Tiny • 78 MB",true);
+  add(models,installTiny,10);installTiny.setOnClickListener(v->downloadTiny());
+  Button importModel=button("Import Whisper .bin model from Downloads",false);
   add(models,importModel,10);importModel.setOnClickListener(v->pick(PICK_MODEL));
   Button browse=button("Open official model repository",false);add(models,browse,8);
   browse.setOnClickListener(v->startActivity(new Intent(Intent.ACTION_VIEW,
@@ -137,6 +139,23 @@ public final class WhisperStudioActivity extends Activity {
     }catch(Exception e){runOnUiThread(()->{transcribe.setEnabled(true);status.setText("Model import failed: "+e.getMessage());});}
    });
   }
+ }
+ private void downloadTiny(){
+  if(busy)return;
+  busy=true;transcribe.setEnabled(false);status.setText("Downloading verified official Whisper Tiny model...");
+  worker.execute(()->{
+   try{
+    WhisperModelStore.downloadTiny(this,p->runOnUiThread(()->progress.setProgress(p)));
+    runOnUiThread(()->{
+     busy=false;transcribe.setEnabled(true);refresh();
+     status.setText("Whisper multilingual Tiny model installed. Now import audio and transcribe.");
+     progress.setProgress(100);
+    });
+   }catch(Exception e){runOnUiThread(()->{
+     busy=false;transcribe.setEnabled(true);
+     status.setText(e.getMessage());progress.setProgress(0);
+   });}
+  });
  }
  private void runInference(){
   if(busy)return;
