@@ -35,12 +35,15 @@ public final class StudioProject {
   public String hostMotion="Float";
   public boolean hostEnabled=false;
   public int overlaySlots=3;
+  public float hostX=.80f,hostY=.68f,hostScale=.29f;
+  public final float[] overlayX=new float[5],overlayY=new float[5],overlayScale=new float[5];
   public final Uri[] overlays=new Uri[5];
   public final String[] overlayPrompts=new String[5];
   public final String[] overlayMotion=new String[5];
   public Shot(long a,long b){
    startMs=a;endMs=b;
-   for(int i=0;i<5;i++){overlayPrompts[i]="";overlayMotion[i]="Float";}
+   for(int i=0;i<5;i++){overlayPrompts[i]="";overlayMotion[i]="Float";
+    overlayX[i]=.23f+(i%3)*.27f;overlayY[i]=.20f+(i/3)*.38f;overlayScale[i]=.20f;}
   }
   public long duration(){return Math.max(1,endMs-startMs);}
  }
@@ -175,15 +178,18 @@ public final class StudioProject {
     .put("transition",s.transition).put("captionStyle",s.captionStyle)
     .put("visual",s.visual==null?"":s.visual.toString())
     .put("host",s.host==null?"":s.host.toString()).put("hostMotion",s.hostMotion)
-    .put("hostEnabled",s.hostEnabled).put("overlaySlots",s.overlaySlots);
+    .put("hostEnabled",s.hostEnabled).put("overlaySlots",s.overlaySlots)
+    .put("hostX",s.hostX).put("hostY",s.hostY).put("hostScale",s.hostScale);
    JSONArray overlayUris=new JSONArray(),overlayPrompts=new JSONArray(),overlayMotions=new JSONArray();
+   JSONArray posX=new JSONArray(),posY=new JSONArray(),scales=new JSONArray();
    for(int i=0;i<5;i++){
     overlayUris.put(s.overlays[i]==null?"":s.overlays[i].toString());
     overlayPrompts.put(s.overlayPrompts[i]);
     overlayMotions.put(s.overlayMotion[i]);
+    posX.put(s.overlayX[i]);posY.put(s.overlayY[i]);scales.put(s.overlayScale[i]);
    }
    x.put("overlays",overlayUris).put("overlayPrompts",overlayPrompts)
-    .put("overlayMotion",overlayMotions);
+    .put("overlayMotion",overlayMotions).put("overlayX",posX).put("overlayY",posY).put("overlayScale",scales);
    all.put(x);
   }
   obj.put("shots",all);
@@ -215,11 +221,17 @@ public final class StudioProject {
    s.hostMotion=x.optString("hostMotion","Float");
    s.hostEnabled=x.optBoolean("hostEnabled",false);
    s.overlaySlots=Math.max(1,Math.min(5,x.optInt("overlaySlots",3)));
+   s.hostX=(float)x.optDouble("hostX",.80);s.hostY=(float)x.optDouble("hostY",.68);
+   s.hostScale=(float)x.optDouble("hostScale",.29);
    JSONArray u=x.optJSONArray("overlays"),p=x.optJSONArray("overlayPrompts"),m=x.optJSONArray("overlayMotion");
+   JSONArray posX=x.optJSONArray("overlayX"),posY=x.optJSONArray("overlayY"),scales=x.optJSONArray("overlayScale");
    for(int i=0;i<5;i++){
     if(u!=null){String uri=u.optString(i,"");if(!uri.isEmpty())s.overlays[i]=Uri.parse(uri);}
     if(p!=null)s.overlayPrompts[i]=p.optString(i,"");
     if(m!=null)s.overlayMotion[i]=m.optString(i,"Float");
+    if(posX!=null)s.overlayX[i]=(float)posX.optDouble(i,s.overlayX[i]);
+    if(posY!=null)s.overlayY[i]=(float)posY.optDouble(i,s.overlayY[i]);
+    if(scales!=null)s.overlayScale[i]=(float)scales.optDouble(i,s.overlayScale[i]);
    }
    project.shots.add(s);
   }
