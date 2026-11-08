@@ -125,7 +125,7 @@ public final class StudioProject {
    long finish=Math.min(project.durationMs,raw.end);
    if(begin>=project.durationMs)break;
    if(begin>cursor){
-    Beat filler=last==null?raw:copyBeat(last);
+    Beat filler=last==null?copyBeat(raw):copyBeat(last);
     filler.start=cursor;filler.end=begin;timeline.add(filler);
    }
    if(finish>begin){
