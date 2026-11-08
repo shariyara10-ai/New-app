@@ -74,8 +74,13 @@ public final class ProTimelineEditorActivity extends Activity {
   try{project=StudioProject.load(this);}
   catch(Exception e){project=StudioProject.plan("",8,60000);}
   getWindow().setStatusBarColor(BG);getWindow().setNavigationBarColor(BG);
+  if(b!=null){selected=b.getInt("selected",0);playheadMs=b.getLong("playhead",0);}
   renderer=new ProVisualOverlay(this,project);
   build();
+ }
+ @Override protected void onSaveInstanceState(Bundle state){
+  state.putInt("selected",selected);state.putLong("playhead",playheadMs);
+  super.onSaveInstanceState(state);
  }
  private long total(){
   long sum=0;for(StudioProject.Shot s:project.shots)sum+=s.duration();
@@ -114,6 +119,9 @@ public final class ProTimelineEditorActivity extends Activity {
   }
  }
  private void build(){
+  if(getResources().getConfiguration().orientation==android.content.res.Configuration.ORIENTATION_LANDSCAPE){
+   buildLandscape();return;
+  }
   scroll=new ScrollView(this);scroll.setFillViewport(true);scroll.setBackgroundColor(BG);
   root=column();root.setPadding(dp(12),dp(14),dp(12),dp(26));scroll.addView(root);setContentView(scroll);
   LinearLayout top=new LinearLayout(this);top.setGravity(Gravity.CENTER_VERTICAL);add(root,top,0);
@@ -168,6 +176,71 @@ public final class ProTimelineEditorActivity extends Activity {
   share.setOnClickListener(v->share());
   timeText.setText(format(playheadMs)+" / "+format(total()));
  }
+ private void buildLandscape(){
+  scroll=new ScrollView(this);scroll.setFillViewport(true);scroll.setBackgroundColor(BG);
+  root=column();root.setPadding(dp(9),dp(7),dp(9),dp(16));scroll.addView(root);setContentView(scroll);
+  LinearLayout top=new LinearLayout(this);top.setGravity(Gravity.CENTER_VERTICAL);add(root,top,0);
+  Button back=btn("‹ Home",false);top.addView(back);back.setOnClickListener(v->finish());
+  TextView heading=label("CINEZEHN  /  PRO VIDEO EDITOR",14,true,WHITE);
+  heading.setPadding(dp(11),0,0,0);top.addView(heading,new LinearLayout.LayoutParams(0,-2,1));
+  Button undo=btn("Undo",false);top.addView(undo);undo.setOnClickListener(v->{
+   if(undoSnapshot!=null){project=undoSnapshot;undoSnapshot=null;retime();recreatePreview();build();}
+  });
+  exportBtn=btn("EXPORT",true);top.addView(exportBtn);exportBtn.setOnClickListener(v->render(false));
+  LinearLayout workspace=new LinearLayout(this);workspace.setGravity(Gravity.TOP);add(root,workspace,7);
+  LinearLayout library=column();library.setPadding(dp(7),dp(8),dp(7),dp(7));
+  library.setBackground(shape(PANEL,13));
+  workspace.addView(library,new LinearLayout.LayoutParams(dp(135),dp(258)));
+  add(library,label("Media / Scenes",11,true,WHITE),0);
+  ScrollView list=new ScrollView(this);
+  LinearLayout shotList=column();list.addView(shotList);
+  for(int i=0;i<project.shots.size();i++){
+   final int index=i;
+   StudioProject.Shot scene=project.shots.get(i);
+   Button choose=btn((i+1)+". "+format(scene.startMs)+"–"+format(scene.endMs),i==selected);
+   choose.setTextSize(10);add(shotList,choose,4);
+   choose.setOnClickListener(v->{selected=index;seek(scene.startMs);buildLandscape();});
+  }
+  library.addView(list,new LinearLayout.LayoutParams(-1,0,1));
+  LinearLayout center=column();center.setPadding(dp(8),0,dp(8),0);
+  workspace.addView(center,new LinearLayout.LayoutParams(0,dp(258),1));
+  view=new Preview(this);center.addView(view,new LinearLayout.LayoutParams(-1,0,1));
+  LinearLayout transport=new LinearLayout(this);transport.setGravity(Gravity.CENTER_VERTICAL);
+  Button play=btn("▶",true);transport.addView(play,new LinearLayout.LayoutParams(dp(53),dp(37)));
+  play.setOnClickListener(v->toggle());
+  timeText=label(format(playheadMs)+" / "+format(total()),11,false,WHITE);
+  timeText.setGravity(Gravity.CENTER);transport.addView(timeText,new LinearLayout.LayoutParams(0,dp(36),1));
+  Button reset=btn("⟲",false);transport.addView(reset,new LinearLayout.LayoutParams(dp(45),dp(36)));
+  reset.setOnClickListener(v->{pause();seek(0);});add(center,transport,3);
+  scrub=new SeekBar(this);scrub.setMax((int)Math.min(Integer.MAX_VALUE,total()));
+  scrub.setProgress((int)Math.min(total(),playheadMs));add(center,scrub,3);
+  scrub.setOnSeekBarChangeListener(new SeekBar.OnSeekBarChangeListener(){
+   @Override public void onProgressChanged(SeekBar b,int v,boolean from){if(from)seek(v);}
+   @Override public void onStartTrackingTouch(SeekBar b){pause();}
+   @Override public void onStopTrackingTouch(SeekBar b){}
+  });
+  ScrollView right=new ScrollView(this);right.setBackground(shape(PANEL,13));
+  controls=column();controls.setPadding(dp(6),dp(8),dp(6),dp(10));
+  right.addView(controls);workspace.addView(right,new LinearLayout.LayoutParams(dp(203),dp(258)));
+  buildTools();
+  LinearLayout track=column();track.setPadding(dp(8),dp(9),dp(8),dp(10));
+  track.setBackground(shape(PANEL,13));add(root,track,8);
+  add(track,label("MULTI-TRACK TIMELINE   •   Select clip for manual changes",10,true,WHITE),0);
+  HorizontalScrollView horizontal=new HorizontalScrollView(this);horizontal.setHorizontalScrollBarEnabled(true);
+  timeline=column();horizontal.addView(timeline);add(track,horizontal,5);drawTimeline();
+  progress=new ProgressBar(this,null,android.R.attr.progressBarStyleHorizontal);
+  progress.setMax(100);add(root,progress,7);
+  status=label("All edits are saved. Portrait and landscape use the same project.",11,false,SECONDARY);
+  add(root,status,5);
+  LinearLayout buttons=new LinearLayout(this);
+  Button planner=btn("Asset Planner",false);buttons.addView(planner,new LinearLayout.LayoutParams(0,dp(39),1));
+  planner.setOnClickListener(v->{pause();store();startActivity(new Intent(this,StoryboardPlannerActivity.class));finish();});
+  Button audio=btn("Audio Cleanup",false);buttons.addView(audio,new LinearLayout.LayoutParams(0,dp(39),1));
+  audio.setOnClickListener(v->startActivity(new Intent(this,SilenceCutActivity.class)));
+  Button share=btn("Share Export",false);buttons.addView(share,new LinearLayout.LayoutParams(0,dp(39),1));
+  share.setOnClickListener(v->share());add(root,buttons,7);
+ }
+
  private void recreatePreview(){renderer=new ProVisualOverlay(this,project);if(view!=null)view.invalidate();}
  private void drawTimeline(){
   timeline.removeAllViews();
@@ -198,19 +271,35 @@ public final class ProTimelineEditorActivity extends Activity {
  private void buildTools(){
   if(controls==null)return;controls.removeAllViews();
   StudioProject.Shot shot=project.shots.get(Math.max(0,Math.min(selected,project.shots.size()-1)));
-  add(controls,label("SELECTED: ASSET "+(selected+1)+" • "+format(shot.startMs)+"–"+format(shot.endMs),14,true,WHITE),0);
-  LinearLayout editRow=new LinearLayout(this);
-  tool(editRow,"Split",()->split());tool(editRow,"Duplicate",()->duplicate());
-  tool(editRow,"←",()->move(-1));tool(editRow,"→",()->move(1));add(controls,editRow,10);
-  LinearLayout row2=new LinearLayout(this);
-  tool(row2,"Duration",()->durationDialog());tool(row2,"Caption",()->captionDialog());
-  tool(row2,"Motion",()->motionDialog());tool(row2,"Layers",()->layerDialog());add(controls,row2,7);
-  LinearLayout row3=new LinearLayout(this);
-  tool(row3,"Delete",()->delete());tool(row3,"Aspect",()->aspectDialog());
-  tool(row3,"Settings",()->exportSettings());tool(row3,"Edit prompts",()->{
-   store();startActivity(new Intent(this,StoryboardPlannerActivity.class));finish();
-  });add(controls,row3,7);
-  add(controls,label("Tap tracks to select shot. Changes affect the actual composition and saved export.",11,false,SECONDARY),10);
+  add(controls,label("ASSET "+(selected+1)+" / "+project.shots.size(),13,true,WHITE),0);
+  boolean wide=getResources().getConfiguration().orientation==android.content.res.Configuration.ORIENTATION_LANDSCAPE;
+  if(wide){
+   toolPair("Split","Duplicate",()->split(),()->duplicate());
+   toolPair("← Move","Move →",()->move(-1),()->move(1));
+   toolPair("Duration","Captions",()->durationDialog(),()->captionDialog());
+   toolPair("Main Motion","PNG Layers",()->motionDialog(),()->layerDialog());
+   toolPair("Delete","Aspect",()->delete(),()->aspectDialog());
+   toolPair("Fonts / Text","Assets",()->exportSettings(),()->{
+    store();startActivity(new Intent(this,StoryboardPlannerActivity.class));finish();
+   });
+  }else{
+   LinearLayout editRow=new LinearLayout(this);
+   tool(editRow,"Split",()->split());tool(editRow,"Duplicate",()->duplicate());
+   tool(editRow,"←",()->move(-1));tool(editRow,"→",()->move(1));add(controls,editRow,10);
+   LinearLayout row2=new LinearLayout(this);
+   tool(row2,"Duration",()->durationDialog());tool(row2,"Caption",()->captionDialog());
+   tool(row2,"Motion",()->motionDialog());tool(row2,"Layers",()->layerDialog());add(controls,row2,7);
+   LinearLayout row3=new LinearLayout(this);
+   tool(row3,"Delete",()->delete());tool(row3,"Aspect",()->aspectDialog());
+   tool(row3,"Fonts",()->exportSettings());tool(row3,"Assets",()->{
+    store();startActivity(new Intent(this,StoryboardPlannerActivity.class));finish();
+   });add(controls,row3,7);
+  }
+  add(controls,label("Tap a clip to select. Edits affect the final MP4.",11,false,SECONDARY),10);
+ }
+ private void toolPair(String a,String b,Runnable x,Runnable y){
+  LinearLayout row=new LinearLayout(this);
+  tool(row,a,x);tool(row,b,y);add(controls,row,5);
  }
  private void split(){
   if(project.shots.size()>=100){warn("100 shot limit reached.");return;}
