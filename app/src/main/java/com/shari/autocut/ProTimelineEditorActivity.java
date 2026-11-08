@@ -318,6 +318,7 @@ public final class ProTimelineEditorActivity extends Activity {
  private StudioProject.Shot copyShot(StudioProject.Shot old){
   StudioProject.Shot copy=new StudioProject.Shot(old.startMs,old.endMs);
   copy.prompt=old.prompt;copy.caption=old.caption;copy.narration=old.narration;
+  copy.manualCaption=old.manualCaption;
   copy.graphics=old.graphics;copy.sfx=old.sfx;copy.transition=old.transition;
   copy.motion=old.motion;copy.captionStyle=old.captionStyle;copy.visual=old.visual;
   copy.host=old.host;copy.hostEnabled=old.hostEnabled;copy.hostMotion=old.hostMotion;
@@ -366,7 +367,7 @@ public final class ProTimelineEditorActivity extends Activity {
   StudioProject.Shot s=project.shots.get(selected);
   EditText value=new EditText(this);value.setMinLines(3);value.setText(s.caption);
   new AlertDialog.Builder(this).setTitle("Edit caption for asset "+(selected+1)).setView(value)
-   .setPositiveButton("Apply",(d,w)->{checkpoint();s.caption=value.getText().toString();store();view.invalidate();})
+   .setPositiveButton("Apply",(d,w)->{checkpoint();s.caption=value.getText().toString();s.manualCaption=true;store();view.invalidate();})
    .setNegativeButton("Cancel",null).show();
  }
  private void motionDialog(){

@@ -211,13 +211,15 @@ public final class WhisperStudioActivity extends Activity {
   if(segments.isEmpty()){status.setText("No valid timestamped lines to apply.");return;}
   try{
    StudioProject project=StudioProject.load(this);
+   project.timedCaptions.clear();
+   project.timedCaptions.addAll(segments);
    for(StudioProject.Shot shot:project.shots){
     StringBuilder b=new StringBuilder();
     for(CaptionSegment cue:segments)
      if(cue.startMs<shot.endMs&&cue.endMs>shot.startMs){
       if(b.length()>0)b.append(" ");b.append(cue.text);
      }
-    shot.caption=b.toString();
+    shot.caption=b.toString();shot.manualCaption=false;
    }
    if(source!=null)project.audioUri=source;
    project.save(this);

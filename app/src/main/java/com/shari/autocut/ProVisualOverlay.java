@@ -89,7 +89,15 @@ public final class ProVisualOverlay extends CanvasOverlay {
     AvatarPainter.draw(canvas,local,mock,project.style);
    }
   }
-  if(project.addCaptions)drawCaption(canvas,active.caption,fraction,active.captionStyle);
+  if(project.addCaptions){
+   String spoken=active.caption;
+   if(!active.manualCaption&&!project.timedCaptions.isEmpty()){
+    spoken="";
+    for(CaptionSegment cue:project.timedCaptions)
+     if(cue.startMs<=t&&t<cue.endMs){spoken=cue.text;break;}
+   }
+   drawCaption(canvas,spoken,fraction,active.captionStyle);
+  }
   // Scene number overlay is a functional visual, not source footage replacement.
   if(!active.prompt.trim().isEmpty()){
    paint.setColor(0xAA151A30);canvas.drawRoundRect(14,16,160,51,13,13,paint);

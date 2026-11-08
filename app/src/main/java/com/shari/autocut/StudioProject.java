@@ -27,10 +27,12 @@ public final class StudioProject {
  public boolean addCaptions=true;
  public boolean enableHost=false;
  public final ArrayList<Shot> shots=new ArrayList<>();
+ public final ArrayList<CaptionSegment> timedCaptions=new ArrayList<>();
 
  public static final class Shot {
   public long startMs,endMs;
   public String prompt="",caption="",narration="",motion="Slow Zoom",graphics="",sfx="",transition="Cut",captionStyle="Bold Pop";
+  public boolean manualCaption=false;
   public Uri visual=null,host=null;
   public String hostMotion="Float";
   public boolean hostEnabled=false;
@@ -175,7 +177,7 @@ public final class StudioProject {
    x.put("startMs",s.startMs).put("endMs",s.endMs)
     .put("prompt",s.prompt).put("caption",s.caption).put("narration",s.narration)
     .put("motion",s.motion).put("graphics",s.graphics).put("sfx",s.sfx)
-    .put("transition",s.transition).put("captionStyle",s.captionStyle)
+    .put("transition",s.transition).put("captionStyle",s.captionStyle).put("manualCaption",s.manualCaption)
     .put("visual",s.visual==null?"":s.visual.toString())
     .put("host",s.host==null?"":s.host.toString()).put("hostMotion",s.hostMotion)
     .put("hostEnabled",s.hostEnabled).put("overlaySlots",s.overlaySlots)
@@ -193,6 +195,13 @@ public final class StudioProject {
    all.put(x);
   }
   obj.put("shots",all);
+  JSONArray captions=new JSONArray();
+  for(CaptionSegment c:timedCaptions){
+   JSONObject item=new JSONObject();
+   item.put("start",c.startMs).put("end",c.endMs).put("text",c.text).put("style",c.style);
+   captions.put(item);
+  }
+  obj.put("timedCaptions",captions);
   return obj.toString();
  }
  public static StudioProject fromJson(String data)throws JSONException{
@@ -216,6 +225,7 @@ public final class StudioProject {
    s.narration=x.optString("narration","");s.motion=x.optString("motion","Slow Zoom");
    s.graphics=x.optString("graphics","");s.sfx=x.optString("sfx","");
    s.transition=x.optString("transition","Cut");s.captionStyle=x.optString("captionStyle","Bold Pop");
+   s.manualCaption=x.optBoolean("manualCaption",false);
    String image=x.optString("visual","");if(!image.isEmpty())s.visual=Uri.parse(image);
    String host=x.optString("host","");if(!host.isEmpty())s.host=Uri.parse(host);
    s.hostMotion=x.optString("hostMotion","Float");
@@ -234,6 +244,14 @@ public final class StudioProject {
     if(scales!=null)s.overlayScale[i]=(float)scales.optDouble(i,s.overlayScale[i]);
    }
    project.shots.add(s);
+  }
+  JSONArray cues=obj.optJSONArray("timedCaptions");
+  if(cues!=null)for(int i=0;i<cues.length();i++){
+   JSONObject c=cues.optJSONObject(i);
+   if(c!=null){
+    long a=c.optLong("start",0),b=c.optLong("end",0);
+    if(b>a)project.timedCaptions.add(new CaptionSegment(a,b,c.optString("text",""),c.optString("style","pop")));
+   }
   }
   return project;
  }
