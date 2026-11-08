@@ -4,6 +4,14 @@
 
 Native Android app: media files from device storage, video preview, editable time-coded captions, offline speech recognition with a user-installed Vosk model, rule-based motion style planning, animated burned-in captions, optional imported PNG sticker, trim/crop, Media3 Transformer encoding, audio-only narration to captioned video, MP4 saved into Movies/CineZehn.
 
+## v0.7.0 native Whisper integration (Android ARM64, experimental)
+- Native JNI inference uses the official open-source **ggml-org/whisper.cpp v1.9.5** sources, pinned and fetched at CI build time.
+- Imported multilingual GGML `.bin` model from local Downloads (the model is NOT bundled; first import requires a real compatible file). Tiny/base multilingual recommended on Pixel 7 Pro. Native CPU-only inference; memory and time usage depend on model.
+- Android PCM decode to 16 kHz mono float, inference in up to 28-second windows, timestamped segment output.
+- Whisper Studio: import model, import audio/video, select Auto/English/Urdu/Hindi/Arabic, transcribe on-device, correct transcript, approximate Romanization, SRT/VTT export, apply segment captions to each Pro storyboard shot.
+- Not guaranteed: word-level alignment, diarization, perfect Hinglish Romanization, translation or exact human-grade accuracy. Requires real phone testing.
+- Build now requires Android NDK 26.3 and CMake 3.22.1. Compiled for arm64-v8a.
+
 ## v0.6.0 AI Storyboard Planner + independent manual Pro Editor
 - **Separate full-featured-by-scope Pro Editor and Flow Clip Merger**. Flow joins Google Flow/Veo video clips independently; the Pro Editor opens scene-based media projects from the Auto Planner.
 - Paste an externally generated ChatGPT *timestamped* master edit prompt; deterministic parser reads VISUAL, MOTION, GRAPHICS, SFX and shot times.

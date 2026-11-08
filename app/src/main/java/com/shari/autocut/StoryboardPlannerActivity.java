@@ -117,6 +117,9 @@ public final class StoryboardPlannerActivity extends Activity {
   for(int i=0;i<nums.length;i++){int val=StudioProject.counts()[i];nums[i]=val+" assets";if(val==project.shots.size())choice=i;}
   countSelect=spinner(nums,choice);add(controls,countSelect,9);
   add(controls,text("Video length comes from the narration file if provided; otherwise the current project's length is used.",12,false,MUTED),10);
+  Button whisperButton=button("♫  WHISPER • Transcribe audio/video to timed captions",false);
+  add(controls,whisperButton,11);
+  whisperButton.setOnClickListener(v->{captureDraft();save();startActivity(new Intent(this,WhisperStudioActivity.class));});
   Button audio=button(project.audioUri==null?"♫  Import narration / voiceover":"✓  Voiceover selected — change file",false);
   add(controls,audio,12);audio.setOnClickListener(v->pick(PICK_AUDIO));
   Button parse=button("✦  ANALYZE MASTER PROMPT & CREATE ASSET SLOTS",true);

@@ -187,12 +187,9 @@ public final class WhisperStudioActivity extends Activity {
    int n=0;
    for(CaptionSegment s:segments){
     if(format.equals("srt"))out.append(++n).append("\n");
-    out.append(srtTime(s.startMs).replace(format.equals("vtt")?',':'\u0000',format.equals("vtt")?'.':'\u0000'));
-    // Formatter runs safely below without introducing NUL characters.
-    int begin=out.length()-12;if(begin>=0&&out.indexOf("\u0000",begin)>=0){
-      out.setLength(out.length()-12);out.append(srtTime(s.startMs));
-    }
-    out.append(" --> ").append(srtTime(s.endMs)).append("\n").append(s.text).append("\n\n");
+    String begin=srtTime(s.startMs),end=srtTime(s.endMs);
+    if(format.equals("vtt")){begin=begin.replace(',','.');end=end.replace(',','.');}
+    out.append(begin).append(" --> ").append(end).append("\n").append(s.text).append("\n\n");
    }
    String body=out.toString();
    if(format.equals("vtt"))body=body.replace(',', '.');
