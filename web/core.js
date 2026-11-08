@@ -80,8 +80,8 @@ export function slotsFromShots(shots,count=20,ratio='9:16',old=[]){
 export function timelineFromShots(shots,assets=[]){const clips=[];
  for(const [i,s] of shots.entries()){
   const a=assets.find(x=>s.start>=x.start&&s.start<x.end)||assets[i%Math.max(assets.length,1)];
-  const pri=clip('video',s.start,s.end-s.start,a?.mediaId||null,{id:uid('shot'),name:s.scene,track:0,motion:s.motion,transition:s.transition,assetId:a?.id,description:s.visual});clips.push(pri);
-  if(s.text)clips.push(clip('caption',s.start,s.end-s.start,null,{name:'Caption',text:s.text,track:3,motion:'None',style:'Karaoke Yellow'}));
+  const pri=clip('video',s.start,s.end-s.start,a?.mediaId||null,{id:uid('shot'),name:s.scene,track:0,motion:a?.primaryMotion||s.motion,transition:a?.transition||s.transition,assetId:a?.id,description:s.visual});clips.push(pri);
+  if(s.text||a?.caption)clips.push(clip('caption',s.start,s.end-s.start,null,{name:'Caption',text:a?.caption||s.text,track:3,motion:'None',style:a?.captionStyle||'Karaoke Yellow'}));
   if(a?.hostEnabled&&a.hostMediaId)clips.push(clip('avatar',s.start,s.end-s.start,a.hostMediaId,{name:'Host',track:2,motion:a.hostMotion,x:.81,y:.73,scale:.42}));
   if(a){for(const [j,ov] of a.overlays.entries())if(ov.enabled&&ov.mediaId)clips.push(clip('overlay',s.start,s.end-s.start,ov.mediaId,{name:`Overlay ${j+1}`,track:1+j%2,motion:ov.motion}));
    for(const [j,ex] of a.extras.entries()){if(ex.enabled&&ex.mediaId)clips.push(clip('overlay',s.start,s.end-s.start,ex.mediaId,{name:`Extra ${j+1}`,track:1+j%2,motion:ex.motion,opacity:ex.opacity}));for(const [k,ov] of ex.overlays.entries())if(ov.enabled&&ov.mediaId)clips.push(clip('overlay',s.start,s.end-s.start,ov.mediaId,{name:`Extra ${j+1} • Overlay ${k+1}`,track:1+(j+k)%2,motion:ov.motion,opacity:ov.opacity}));}
