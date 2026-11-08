@@ -1,8 +1,17 @@
-# CineZehn AI Studio — Android Creator PRO Beta v0.4.1
+# CineZehn AI Studio — v0.6.0 Pro Storyboard Editor
 
 **This APK works on an Android phone without a PC, local server, OpenAI API, cloud account, or subscription.**
 
 Native Android app: media files from device storage, video preview, editable time-coded captions, offline speech recognition with a user-installed Vosk model, rule-based motion style planning, animated burned-in captions, optional imported PNG sticker, trim/crop, Media3 Transformer encoding, audio-only narration to captioned video, MP4 saved into Movies/CineZehn.
+
+## v0.6.0 AI Storyboard Planner + independent manual Pro Editor
+- **Separate full-featured-by-scope Pro Editor and Flow Clip Merger**. Flow joins Google Flow/Veo video clips independently; the Pro Editor opens scene-based media projects from the Auto Planner.
+- Paste an externally generated ChatGPT *timestamped* master edit prompt; deterministic parser reads VISUAL, MOTION, GRAPHICS, SFX and shot times.
+- Select 5–100 assets. Every visual has its own generated **text prompt**, editable upload slot and motion style; up to **five additional PNG overlay slots** per shot each with prompt, file chooser, effect and position/size; per-shot optional avatar-host PNG and motion effect. PNG/image creation itself is NOT included offline as a neural generator.
+- Open Manual Pro Editor after planning. Preview imported scene images/overlays, split/reorder/duplicate/delete scenes, modify captions, timing, aspect, host and overlay positions/motions, undo one change checkpoint.
+- Actual on-device Media3 video compositing draws these layers and effects onto rendered output, mixed with user-imported narration audio; MP4 export saves to Gallery.
+- **Honest current limitations:** This beta does not run a local GPT-style reasoning model or a built-in Whisper engine, nor does it perform trained semantic AI scene detection, phoneme-level avatar lip sync, AI image/video generation or automatic stock fetching. Vosk from the legacy editor remains separately available. Editor is scene-layer oriented, not yet a full multi-video NLE.
+- Test the app on device, especially rendering, rotated layouts, codec support, live previews and output audio sync.
 
 ## v0.5.0 modern studio + new offline tools
 - New modern Android **Home Dashboard**, 5-screen navigation (Home, Studios, Offline Director, Creative Library, Settings), persistent dark/light dashboard preference, offline-readiness status and context-aware editing briefs.

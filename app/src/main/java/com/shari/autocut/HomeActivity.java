@@ -35,7 +35,7 @@ public final class HomeActivity extends Activity {
  private int borderColor(){return dark?Color.rgb(56,68,94):Color.rgb(231,236,245);}
  @Override public void onCreate(Bundle state){
   super.onCreate(state);
-  dark=getPreferences(0).getBoolean("dark",false);
+  dark=getPreferences(0).getBoolean("dark",true);
   page=state==null?0:Math.max(0,Math.min(4,state.getInt("page",0)));
   display(page);
  }
@@ -137,15 +137,17 @@ public final class HomeActivity extends Activity {
   add(card,text("YOUR CREATIVE AI WORKSPACE",10,true,Color.rgb(212,216,255)),0);
   add(card,text("Edit smarter.\nCreate faster.",30,true,Color.WHITE),12);
   add(card,text("Flow/Veo clips, cinematic captions, offline tools & professional MP4 exports — right on your phone.",13,false,Color.rgb(230,229,255)),11);
-  Button make=button("+  New Flow / Veo Project",true);make.setBackground(shape(Color.WHITE,14,0));make.setTextColor(Color.rgb(50,59,181));
-  add(card,make,19);make.setOnClickListener(v->openFlow(null,null));
+  Button make=button("+  NEW AI VIDEO PROJECT",true);make.setBackground(shape(Color.WHITE,14,0));make.setTextColor(Color.rgb(50,59,181));
+  add(card,make,19);make.setOnClickListener(v->startActivity(new Intent(this,StoryboardPlannerActivity.class)));
   add(content,card,20);
  }
  private void home(){
   hero();
   smallHeading("Your studios");
-  featureCard("▣","Flow / Veo Clip Studio","Import multiple 8-second scenes, trim, add captions, procedural motion graphics and export.","Open multi-clip studio",()->openFlow(null,null));
-  featureCard("▶","Single Video & Voiceover","Edit MP4/audio, transcribe with an installed speech model, add PNG and burned-in captions.","Open single-video studio",()->startActivity(new Intent(this,MainActivity.class)));
+  featureCard("✦","AI AUTO PLANNER","Paste a ChatGPT timestamped master editing prompt; choose 10–100 visual slots and import scene PNGs, up to 5 overlays and custom host per shot.","Open Auto Planner",()->startActivity(new Intent(this,StoryboardPlannerActivity.class)));
+  featureCard("✂","VIDEO EDITOR PRO","Full manual storyboard finishing: scene timeline, layer positions, real keyframe-style effects, caption changes and final MP4 export.","Open Pro Editor",()->startActivity(new Intent(this,ProTimelineEditorActivity.class)));
+  featureCard("▣","FLOW CLIP MERGER — SEPARATE","A dedicated quick tool only for joining Google Flow/Veo-generated clips. Never mixed with the Pro Editor.","Open Flow Merger",()->openFlow(null,null));
+  featureCard("▶","LEGACY SINGLE-VIDEO TOOL","Basic source trimming, Vosk recognition and captioned media output. Advanced workflow is Pro Editor.","Open legacy tool",()->startActivity(new Intent(this,MainActivity.class)));
   featureCard("✧","Offline Creative Director","Give a natural-language instruction; receive a local rule-based editing plan you can apply to a Flow project.","Open AI Director",()->display(2));
   featureCard("◈","Motion & Asset Library","Browse installed procedural presets, styles and animated original graphics.","Explore library",()->display(3));
   featureCard("✂","Offline Silence Cutter","Analyze audio volume, remove long quiet gaps and export a new MP4/M4A without changing your original.","Open silence cutter",()->startActivity(new Intent(this,SilenceCutActivity.class)));
@@ -161,8 +163,10 @@ public final class HomeActivity extends Activity {
  }
  private void studios(){
   title("Creation studios","Choose your source and start a real editing workflow.");
-  featureCard("▣","Flow Scene Editor","Multiple clips, original narration, non-destructive trim, original procedural overlays, editable subtitles, SRT export and MP4 rendering.","Create Flow project",()->openFlow(null,null));
-  featureCard("▶","Video & Audio Editor","Single video, voiceover, captions, optional PNG, duration trim, 15-second diagnostic and Gallery export.","Open editor",()->startActivity(new Intent(this,MainActivity.class)));
+  featureCard("✦","AUTO PLANNER & ASSET UPLOADS","Choose a storyboard asset count, receive one prompt/upload slot per visual, 5 optional overlays each and a selectable PNG host.","Create AI edit plan",()->startActivity(new Intent(this,StoryboardPlannerActivity.class)));
+  featureCard("✂","VIDEO EDITOR PRO","Dedicated manual finishing timeline, layer transforms, independent scene timing and MP4 export.","Open professional editor",()->startActivity(new Intent(this,ProTimelineEditorActivity.class)));
+  featureCard("▣","FLOW CLIP MERGER (SEPARATE)","Join independent Google Flow/Veo clips without forcing effects, host or captions; manual reorder and MP4 export.","Open clip merger",()->openFlow(null,null));
+  featureCard("▶","LEGACY VIDEO / AUDIO TOOL","Basic imported video/voiceover, captions and optional PNG. Use Pro Editor for new projects.","Open legacy editor",()->startActivity(new Intent(this,MainActivity.class)));
   featureCard("◍","Offline Voice & Caption Tools","Import a Vosk ZIP, transcribe a selected audio/video clip, approximate Romanization and correct subtitles manually.","Open transcription tools",()->startActivity(new Intent(this,MainActivity.class)));
   featureCard("⌁","Cinematic Effects Library","Animated scene numbering, context graphics, highlighted text, intro/outro and 12 story styles.","See real effect options",()->display(3));
   featureCard("✂","Silence & Pauses","Offline energy analysis to identify quiet sections, adjustable sensitivity, non-destructive clipping and export.","Open silence cutter",()->startActivity(new Intent(this,SilenceCutActivity.class)));
