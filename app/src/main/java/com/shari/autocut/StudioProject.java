@@ -117,18 +117,61 @@ public final class StudioProject {
   }
   beats.sort(Comparator.comparingLong(a->a.start));
   int count=Math.max(1,Math.min(100,requestedCount));
-  for(int i=0;i<count;i++){
-   long a=Math.round(i*project.durationMs/(double)count);
-   long b=Math.round((i+1)*project.durationMs/(double)count);
-   Shot s=new Shot(a,b);
-   Beat closest=null;long best=Long.MAX_VALUE;
-   long mid=(a+b)/2;
-   for(Beat beat:beats){
-    long diff;
-    if(mid>=beat.start&&mid<beat.end)diff=0;
-    else diff=Math.min(Math.abs(mid-beat.start),Math.abs(mid-beat.end));
-    if(diff<best){best=diff;closest=beat;}
+  ArrayList<Beat> timeline=new ArrayList<>();
+  long cursor=0;
+  Beat last=null;
+  for(Beat raw:beats){
+   long begin=Math.max(cursor,Math.max(0,raw.start));
+   long finish=Math.min(project.durationMs,raw.end);
+   if(begin>=project.durationMs)break;
+   if(begin>cursor){
+    Beat filler=last==null?raw:copyBeat(last);
+    filler.start=cursor;filler.end=begin;timeline.add(filler);
    }
+   if(finish>begin){
+    Beat segment=copyBeat(raw);
+    segment.start=begin;segment.end=finish;
+    timeline.add(segment);cursor=finish;last=raw;
+   }
+  }
+  if(cursor<project.durationMs){
+   Beat filler=last==null?beats.get(0):copyBeat(last);
+   filler.start=cursor;filler.end=project.durationMs;timeline.add(filler);
+  }
+  if(timeline.isEmpty()){
+   Beat one=new Beat();one.start=0;one.end=project.durationMs;
+   one.prompt="Relevant cinematic visual";timeline.add(one);
+  }
+  // Preserve meaningful source shot boundaries when selected asset count allows it.
+  while(timeline.size()>count){
+   int join=0;long min=Long.MAX_VALUE;
+   for(int i=0;i<timeline.size()-1;i++){
+    long combined=timeline.get(i+1).end-timeline.get(i).start;
+    if(combined<min){min=combined;join=i;}
+   }
+   Beat a=timeline.get(join),b=timeline.get(join+1);
+   Beat merged=copyBeat(a);merged.end=b.end;
+   if(!b.prompt.isEmpty()&&!b.prompt.equals(a.prompt))
+    merged.prompt=(a.prompt.isEmpty()?"":a.prompt+"; then ")+b.prompt;
+   if(!b.graphics.isEmpty())merged.graphics+=(merged.graphics.isEmpty()?"":"; ")+b.graphics;
+   if(!b.sfx.isEmpty())merged.sfx+=(merged.sfx.isEmpty()?"":"; ")+b.sfx;
+   timeline.set(join,merged);timeline.remove(join+1);
+  }
+  while(timeline.size()<count){
+   int split=0;long longest=-1;
+   for(int i=0;i<timeline.size();i++){
+    Beat b=timeline.get(i);if(b.end-b.start>longest){longest=b.end-b.start;split=i;}
+   }
+   Beat b=timeline.get(split);
+   if(longest<2)break;
+   long middle=b.start+longest/2;
+   Beat second=copyBeat(b);second.start=middle;
+   b.end=middle;timeline.add(split+1,second);
+  }
+  for(int i=0;i<timeline.size();i++){
+   Beat closest=timeline.get(i);
+   long a=closest.start,b=closest.end;
+   Shot s=new Shot(a,b);
    if(closest!=null){
     s.prompt=closest.prompt.isEmpty()?"Cinematic relevant visual for timeline position "+(i+1):closest.prompt;
     s.motion=guessMotion(closest.motion);
@@ -146,6 +189,12 @@ public final class StudioProject {
    project.shots.add(s);
   }
   return project;
+ }
+ private static Beat copyBeat(Beat other){
+  Beat b=new Beat();b.start=other.start;b.end=other.end;
+  b.prompt=other.prompt;b.caption=other.caption;b.narration=other.narration;
+  b.motion=other.motion;b.graphics=other.graphics;b.sfx=other.sfx;
+  b.transition=other.transition;return b;
  }
  private static String guessMotion(String description){
   String s=description.toLowerCase(Locale.ROOT);
