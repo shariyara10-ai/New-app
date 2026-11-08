@@ -72,8 +72,26 @@ public final class ProVisualOverlay extends CanvasOverlay {
   long local=t-active.startMs;
   float fraction=Math.min(1f,Math.max(0f,local/(float)active.duration()));
   Bitmap visual=get(active.visual);
-  if(visual!=null)drawBackground(canvas,visual,active.motion,fraction);
-  else drawAssetNeeded(canvas,idx,w,h);
+  if(visual!=null){
+   String transition=active.transition==null?"":active.transition.toLowerCase(Locale.ROOT);
+   float transitionProgress=Math.min(1f,local/380f);
+   boolean transitional=idx>0&&local<380&&
+       (transition.contains("fade")||transition.contains("dissolve")||transition.contains("wipe")||transition.contains("swipe"));
+   if(transitional){
+    StudioProject.Shot previous=project.shots.get(idx-1);
+    Bitmap previousImage=get(previous.visual);
+    if(previousImage!=null)drawBackground(canvas,previousImage,previous.motion,1f);
+    canvas.save();
+    if(transition.contains("wipe")||transition.contains("swipe")){
+     canvas.clipRect(0,0,w*transitionProgress,h);
+     drawBackground(canvas,visual,active.motion,fraction);
+    }else{
+     paint.setAlpha((int)(255*transitionProgress));
+     drawBackground(canvas,visual,active.motion,fraction,transitionProgress);
+    }
+    canvas.restore();
+   }else drawBackground(canvas,visual,active.motion,fraction);
+  }else drawAssetNeeded(canvas,idx,w,h);
   for(int layer=0;layer<active.overlaySlots;layer++){
    Bitmap overlay=get(active.overlays[layer]);
    if(overlay!=null)drawLayer(canvas,overlay,active.overlayX[layer],active.overlayY[layer],
@@ -114,6 +132,9 @@ public final class ProVisualOverlay extends CanvasOverlay {
   type.setTextSize(Math.max(12,w*.026f));c.drawText("Import an image or return to the planner",w*.5f,h*.47f,type);
  }
  private void drawBackground(Canvas c,Bitmap bitmap,String motion,float t){
+  drawBackground(c,bitmap,motion,t,1f);
+ }
+ private void drawBackground(Canvas c,Bitmap bitmap,String motion,float t,float opacity){
   float w=c.getWidth(),h=c.getHeight();
   float bw=bitmap.getWidth(),bh=bitmap.getHeight();
   float base=Math.max(w/bw,h/bh);
@@ -131,7 +152,7 @@ public final class ProVisualOverlay extends CanvasOverlay {
    shiftX=(float)Math.sin(t*130)*w*.014f;shiftY=(float)Math.cos(t*112)*h*.009f;
   }
   if("Float".equals(motion))shiftY=(float)Math.sin(t*6)*h*.007f;
-  paint.setColor(Color.WHITE);paint.setAlpha("Fade".equals(motion)?(int)(255*Math.min(1,t*5)):255);
+  paint.setColor(Color.WHITE);paint.setAlpha((int)(255*opacity*("Fade".equals(motion)?Math.min(1,t*5):1)));
   RectF destination=new RectF((w-sizeW)*.5f+shiftX,(h-sizeH)*.5f+shiftY,
      (w+sizeW)*.5f+shiftX,(h+sizeH)*.5f+shiftY);
   c.save();c.clipRect(0,0,w,h);
