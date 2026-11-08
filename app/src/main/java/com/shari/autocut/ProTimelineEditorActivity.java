@@ -92,21 +92,24 @@ public final class ProTimelineEditorActivity extends Activity {
   return String.format(Locale.US,"%02d:%02d",ms/60000,(ms/1000)%60);
  }
  private final class Preview extends View{
-  private final Paint brush=new Paint(Paint.ANTI_ALIAS_FLAG);
+  private final Paint brush=new Paint(Paint.ANTI_ALIAS_FLAG|Paint.FILTER_BITMAP_FLAG);
+  private Bitmap buffer;
   Preview(Context c){super(c);setBackgroundColor(Color.BLACK);}
   @Override protected void onDraw(Canvas c){
    super.onDraw(c);
    float availableW=getWidth(),availableH=getHeight();
+   if(availableW<=0||availableH<=0)return;
    float scale=Math.min(availableW/project.width,availableH/project.height);
    float drawW=project.width*scale,drawH=project.height*scale;
    c.save();c.translate((availableW-drawW)/2,(availableH-drawH)/2);
    c.scale(scale,scale);
-   // CanvasOverlay uses actual canvas dimensions: temporary offscreen canvas ensures the same
-   // aspect ratio in portrait and landscape previews.
-   Bitmap frame=Bitmap.createBitmap(Math.min(1280,project.width),Math.min(1280,project.height),Bitmap.Config.ARGB_8888);
-   Canvas inner=new Canvas(frame);renderer.drawAt(inner,playheadMs);
-   c.drawBitmap(frame,null,new RectF(0,0,project.width,project.height),brush);
-   frame.recycle();
+   if(buffer==null||buffer.getWidth()!=project.width||buffer.getHeight()!=project.height){
+    if(buffer!=null)buffer.recycle();
+    buffer=Bitmap.createBitmap(project.width,project.height,Bitmap.Config.ARGB_8888);
+   }
+   Canvas inner=new Canvas(buffer);inner.drawColor(Color.TRANSPARENT,PorterDuff.Mode.CLEAR);
+   renderer.drawAt(inner,playheadMs);
+   c.drawBitmap(buffer,null,new RectF(0,0,project.width,project.height),brush);
    c.restore();
   }
  }
